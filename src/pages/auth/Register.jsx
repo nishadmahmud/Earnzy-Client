@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
-import { Link } from 'react-router';
+import React, { useState, useContext } from 'react';
+import { Link, useNavigate } from 'react-router';
 import { FiEye, FiEyeOff } from 'react-icons/fi';
+import { AuthContext } from '../../auth/AuthProvider';
 
 const roles = [
   { value: '', label: 'Select role' },
@@ -10,6 +11,19 @@ const roles = [
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const strongPassword = /^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d!@#$%^&*()_+\-=]{8,}$/;
+
+function getPasswordStrength(password) {
+  let score = 0;
+  if (password.length >= 8) score++;
+  if (/[A-Z]/.test(password)) score++;
+  if (/[a-z]/.test(password)) score++;
+  if (/[0-9]/.test(password)) score++;
+  if (/[^A-Za-z0-9]/.test(password)) score++;
+  if (score <= 2) return { label: 'Weak', color: 'text-red-500' };
+  if (score === 3) return { label: 'Medium', color: 'text-yellow-500' };
+  if (score >= 4) return { label: 'Strong', color: 'text-green-600' };
+  return { label: '', color: '' };
+}
 
 const Register = () => {
   const [form, setForm] = useState({
@@ -21,6 +35,10 @@ const Register = () => {
   });
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState({});
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const { createUser, updateUserProfile } = useContext(AuthContext);
+  const navigate = useNavigate();
 
   const validate = () => {
     const newErrors = {};
@@ -36,20 +54,33 @@ const Register = () => {
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
     setErrors({ ...errors, [e.target.name]: undefined });
+    setError('');
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (validate()) {
-      // TODO: Handle registration logic
-      alert('Registration successful!');
+    setError('');
+    if (!validate()) return;
+    setLoading(true);
+    try {
+      await createUser(form.email, form.password);
+      await updateUserProfile(form.name, form.profilePic);
+      navigate('/');
+    } catch (err) {
+      setError(err.message || 'Registration failed.');
+    } finally {
+      setLoading(false);
     }
   };
+
+  const passwordStrength = getPasswordStrength(form.password);
+  const emailValid = form.email.length === 0 ? null : emailRegex.test(form.email);
 
   return (
     <div className="min-h-[70vh] flex items-center justify-center bg-slate-50 font-sans pt-12">
       <div className="w-full max-w-md bg-white p-6 rounded-xl shadow-md border border-slate-100">
         <h2 className="text-2xl font-bold text-slate-800 mb-4 text-center">Create your Earnzy account</h2>
+        {error && <div className="mb-3 text-red-600 text-sm text-center">{error}</div>}
         <form className="space-y-3" onSubmit={handleSubmit} noValidate>
           <div>
             <label htmlFor="name" className="block text-sm font-medium text-slate-700 mb-1">Name</label>
@@ -75,6 +106,11 @@ const Register = () => {
               required
               className={`w-full px-4 py-1.5 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-slate-800 bg-slate-50 ${errors.email ? 'border-red-400' : 'border-slate-200'}`}
             />
+            {form.email && !emailValid && (
+              <div className="mt-1 text-xs text-red-500">
+                Invalid email
+              </div>
+            )}
             {errors.email && <p className="text-xs text-red-500 mt-1">{errors.email}</p>}
           </div>
           <div>
@@ -111,6 +147,11 @@ const Register = () => {
                 {showPassword ? <FiEyeOff className="h-5 w-5" /> : <FiEye className="h-5 w-5" />}
               </button>
             </div>
+            {form.password && (
+              <div className={`mt-1 text-xs ${passwordStrength.color}`}>
+                Password strength: {passwordStrength.label}
+              </div>
+            )}
             {errors.password && <p className="text-xs text-red-500 mt-1">{errors.password}</p>}
             <p className="text-xs text-slate-500 mt-1">Password must be at least 8 characters and include a number.</p>
           </div>
@@ -132,9 +173,10 @@ const Register = () => {
           </div>
           <button
             type="submit"
-            className="w-full py-1.5 px-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-md shadow-sm transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 mt-2"
+            className="w-full py-1.5 px-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-md shadow-sm transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 mt-2 disabled:opacity-60"
+            disabled={loading}
           >
-            Register
+            {loading ? 'Registering...' : 'Register'}
           </button>
         </form>
         <div className="mt-4 text-center">

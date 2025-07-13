@@ -1,22 +1,32 @@
-import React, { useState } from 'react';
-import { Link } from 'react-router';
+import React, { useState, useContext } from 'react';
+import { Link, useNavigate } from 'react-router';
 import { FcGoogle } from 'react-icons/fc';
 import { FiEye, FiEyeOff } from 'react-icons/fi';
+import { AuthContext } from '../../auth/AuthProvider';
 
 const Login = () => {
     const [showPassword, setShowPassword] = useState(false);
+    const [error, setError] = useState('');
+    const { googleSignIn } = useContext(AuthContext);
+    const navigate = useNavigate();
 
-    // Placeholder for Google sign-in logic
-    const handleGoogleSignIn = (e) => {
+    // Google sign-in logic
+    const handleGoogleSignIn = async (e) => {
         e.preventDefault();
-        // TODO: Connect to your Google Auth logic here
-        alert('Google Sign-In clicked!');
+        setError('');
+        try {
+            await googleSignIn();
+            navigate('/');
+        } catch {
+            setError('Google sign-in failed.');
+        }
     };
 
     return (
         <div className="min-h-[70vh] flex items-center justify-center bg-slate-50 font-sans pt-12">
             <div className="w-full max-w-md bg-white p-6 rounded-xl shadow-md border border-slate-100">
                 <h2 className="text-2xl font-bold text-slate-800 mb-4 text-center">Sign in to Earnzy</h2>
+                {error && <div className="mb-3 text-red-600 text-sm text-center">{error}</div>}
                 <form className="space-y-3">
                     <div>
                         <label htmlFor="email" className="block text-sm font-medium text-slate-700 mb-1">Email address</label>
