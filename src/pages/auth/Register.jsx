@@ -65,6 +65,17 @@ const Register = () => {
     try {
       await createUser(form.email, form.password);
       await updateUserProfile(form.name, form.profilePic);
+      // Save user to MongoDB
+      await fetch('http://localhost:5000/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: form.name,
+          email: form.email,
+          profilePic: form.profilePic,
+          role: form.role,
+        }),
+      });
       navigate('/');
     } catch (err) {
       setError(err.message || 'Registration failed.');

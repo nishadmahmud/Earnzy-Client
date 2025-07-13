@@ -15,7 +15,19 @@ const Login = () => {
         e.preventDefault();
         setError('');
         try {
-            await googleSignIn();
+            const result = await googleSignIn();
+            // Save user to MongoDB (only if new)
+            const user = result.user;
+            await fetch('http://localhost:5000/users', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name: user.displayName,
+                    email: user.email,
+                    profilePic: user.photoURL,
+                    role: 'worker',
+                }),
+            });
             navigate('/');
         } catch {
             setError('Google sign-in failed.');
