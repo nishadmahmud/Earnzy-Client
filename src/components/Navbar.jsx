@@ -1,12 +1,13 @@
-import React, { useState, useContext, useRef } from 'react';
+import React, { useState, useContext, useRef, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
-import { FiMenu, FiX, FiGithub, FiChevronDown, FiLogOut, FiUser } from 'react-icons/fi';
+import { FiMenu, FiX, FiGithub, FiChevronDown, FiLogOut, FiUser, FiDollarSign } from 'react-icons/fi';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AuthContext } from '../auth/AuthProvider';
 
 const Navbar = () => {
     const [isOpen, setIsOpen] = useState(false);
     const [dropdownOpen, setDropdownOpen] = useState(false);
+    const [userData, setUserData] = useState(null);
     const location = useLocation();
     const navigate = useNavigate();
     const { user, logOut } = useContext(AuthContext);
@@ -19,15 +20,38 @@ const Navbar = () => {
 
     const isActive = (path) => location.pathname === path;
 
+    // Fetch user data when user is logged in
+    useEffect(() => {
+        if (user?.email) {
+            fetch(`http://localhost:5000/users?email=${encodeURIComponent(user.email)}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data.error) {
+                        console.error('Error fetching user data:', data.error);
+                        setUserData(null);
+                    } else {
+                        setUserData(data);
+                    }
+                })
+                .catch(err => {
+                    console.error('Error fetching user data:', err);
+                    setUserData(null);
+                });
+        } else {
+            setUserData(null);
+        }
+    }, [user]);
+
     // Handle logout
     const handleLogout = async () => {
         await logOut();
         setDropdownOpen(false);
+        setUserData(null);
         navigate('/');
     };
 
     // Close dropdown on outside click
-    React.useEffect(() => {
+    useEffect(() => {
         function handleClickOutside(event) {
             if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
                 setDropdownOpen(false);
@@ -90,44 +114,65 @@ const Navbar = () => {
                                 </motion.a>
                             </>
                         ) : (
-                            <div className="relative" ref={dropdownRef}>
-                                <button
-                                    onClick={() => setDropdownOpen((prev) => !prev)}
-                                    className="flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium text-slate-700 hover:text-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                >
-                                    <img
-                                        src={user.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.displayName || 'User')}`}
-                                        alt="User"
-                                        className="w-8 h-8 rounded-full object-cover border border-slate-200"
-                                    />
-                                    <span className="hidden md:inline font-medium max-w-[120px] truncate">{user.displayName || 'User'}</span>
-                                    <FiChevronDown className="ml-1" />
-                                </button>
-                                <AnimatePresence>
-                                    {dropdownOpen && (
-                                        <motion.div
-                                            initial={{ opacity: 0, y: -10 }}
-                                            animate={{ opacity: 1, y: 0 }}
-                                            exit={{ opacity: 0, y: -10 }}
-                                            className="absolute right-0 mt-2 w-44 bg-white border border-slate-200 rounded-lg shadow-lg py-2 z-50"
-                                        >
-                                            <Link
-                                                to="/dashboard"
-                                                className="flex items-center px-4 py-2 text-slate-700 hover:bg-slate-100 hover:text-blue-600 transition-colors text-sm"
-                                                onClick={() => setDropdownOpen(false)}
+                            <>
+                                {/* User Info Section */}
+                                {userData && (
+                                    <div className="flex items-center space-x-4">
+                                        {/* Coins Display */}
+                                        <div className="flex items-center space-x-1 bg-slate-100 px-3 py-1 rounded-full">
+                                            <FiDollarSign className="h-4 w-4 text-green-600" />
+                                            <span className="text-sm font-medium text-slate-700">
+                                                {userData.coins || 0}
+                                            </span>
+                                        </div>
+                                        {/* Role Badge */}
+                                        <div className="px-2 py-1 bg-blue-100 text-blue-700 text-xs font-medium rounded-full capitalize">
+                                            {userData.role || 'user'}
+                                        </div>
+                                    </div>
+                                )}
+                                
+                                <div className="relative" ref={dropdownRef}>
+                                    <button
+                                        onClick={() => setDropdownOpen((prev) => !prev)}
+                                        className="flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium text-slate-700 hover:text-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    >
+                                        <img
+                                            src={user.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.displayName || 'User')}`}
+                                            alt="User"
+                                            className="w-8 h-8 rounded-full object-cover border border-slate-200"
+                                        />
+                                        <span className="hidden md:inline font-medium max-w-[120px] truncate">
+                                            {userData?.name || user.displayName || 'User'}
+                                        </span>
+                                        <FiChevronDown className="ml-1" />
+                                    </button>
+                                    <AnimatePresence>
+                                        {dropdownOpen && (
+                                            <motion.div
+                                                initial={{ opacity: 0, y: -10 }}
+                                                animate={{ opacity: 1, y: 0 }}
+                                                exit={{ opacity: 0, y: -10 }}
+                                                className="absolute right-0 mt-2 w-44 bg-white border border-slate-200 rounded-lg shadow-lg py-2 z-50"
                                             >
-                                                <FiUser className="mr-2" /> Dashboard
-                                            </Link>
-                                            <button
-                                                onClick={handleLogout}
-                                                className="flex items-center w-full px-4 py-2 text-slate-700 hover:bg-slate-100 hover:text-blue-600 transition-colors text-sm"
-                                            >
-                                                <FiLogOut className="mr-2" /> Logout
-                                            </button>
-                                        </motion.div>
-                                    )}
-                                </AnimatePresence>
-                            </div>
+                                                <Link
+                                                    to="/dashboard"
+                                                    className="flex items-center px-4 py-2 text-slate-700 hover:bg-slate-100 hover:text-blue-600 transition-colors text-sm"
+                                                    onClick={() => setDropdownOpen(false)}
+                                                >
+                                                    <FiUser className="mr-2" /> Dashboard
+                                                </Link>
+                                                <button
+                                                    onClick={handleLogout}
+                                                    className="flex items-center w-full px-4 py-2 text-slate-700 hover:bg-slate-100 hover:text-blue-600 transition-colors text-sm"
+                                                >
+                                                    <FiLogOut className="mr-2" /> Logout
+                                                </button>
+                                            </motion.div>
+                                        )}
+                                    </AnimatePresence>
+                                </div>
+                            </>
                         )}
                     </div>
 
@@ -187,16 +232,33 @@ const Navbar = () => {
                                     </motion.a>
                                 </>
                             ) : (
-                                <div className="px-3 py-2 flex items-center gap-2">
-                                    <img
-                                        src={user.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.displayName || 'User')}`}
-                                        alt="User"
-                                        className="w-8 h-8 rounded-full object-cover border border-slate-200"
-                                    />
-                                    <span className="font-medium max-w-[120px] truncate">{user.displayName || 'User'}</span>
+                                <div className="px-3 py-2 space-y-2">
+                                    <div className="flex items-center gap-2">
+                                        <img
+                                            src={user.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.displayName || 'User')}`}
+                                            alt="User"
+                                            className="w-8 h-8 rounded-full object-cover border border-slate-200"
+                                        />
+                                        <span className="font-medium max-w-[120px] truncate">
+                                            {userData?.name || user.displayName || 'User'}
+                                        </span>
+                                    </div>
+                                    {userData && (
+                                        <div className="flex items-center space-x-2">
+                                            <div className="flex items-center space-x-1 bg-slate-100 px-2 py-1 rounded-full">
+                                                <FiDollarSign className="h-3 w-3 text-green-600" />
+                                                <span className="text-xs font-medium text-slate-700">
+                                                    {userData.coins || 0}
+                                                </span>
+                                            </div>
+                                            <div className="px-2 py-1 bg-blue-100 text-blue-700 text-xs font-medium rounded-full capitalize">
+                                                {userData.role || 'user'}
+                                            </div>
+                                        </div>
+                                    )}
                                     <button
                                         onClick={handleLogout}
-                                        className="ml-2 px-3 py-1 rounded bg-slate-100 text-slate-700 hover:bg-blue-600 hover:text-white text-sm"
+                                        className="w-full mt-2 px-3 py-2 rounded bg-slate-100 text-slate-700 hover:bg-blue-600 hover:text-white text-sm flex items-center justify-center"
                                     >
                                         <FiLogOut className="inline mr-1" /> Logout
                                     </button>
