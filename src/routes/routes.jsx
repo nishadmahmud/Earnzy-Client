@@ -17,6 +17,8 @@ import WorkerTaskDetails from "../pages/Dashboard/Wroker/WorkerTaskDetails";
 import WorkerMySubmissions from "../pages/Dashboard/Wroker/WorkerMySubmissions";
 import WorkerWithdrawals from "../pages/Dashboard/Wroker/WorkerWithdrawals";
 import DashboardHome from "../pages/Dashboard/DashboardHome";
+import ManageUsers from "../pages/Dashboard/Admin/ManageUsers";
+import ManageTasks from "../pages/Dashboard/Admin/ManageTasks";
 
 const router = createBrowserRouter([
   {
@@ -41,8 +43,8 @@ const router = createBrowserRouter([
       { path: "my-tasks", element: <MyTasks /> },
       { path: "purchase-coin", element: <PurchaseCoin /> },
       { path: "payment-history", element: <PaymentHistory /> },
-      { path: "manage-users", element: <div>Manage Users (Admin)</div> },
-      { path: "manage-tasks", element: <div>Manage Task (Admin)</div> },
+      { path: "manage-users", element: <ManageUsers /> },
+      { path: "manage-tasks", element: <ManageTasks /> },
     ],
   },
   {

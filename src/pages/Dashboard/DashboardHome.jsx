@@ -2,6 +2,7 @@ import React, { useContext, useEffect, useState } from 'react';
 import { AuthContext } from '../../auth/AuthProvider';
 import BuyerHome from './Buyer/BuyerHome';
 import WorkerHome from '../Dashboard/Wroker/WorkerHome';
+import AdminHome from './Admin/AdminHome';
 
 const DashboardHome = () => {
   const { user } = useContext(AuthContext);
@@ -12,7 +13,7 @@ const DashboardHome = () => {
     if (user?.email) {
       fetch(`http://localhost:5000/users?email=${encodeURIComponent(user.email)}`)
         .then(res => res.json())
-        .then(data => setRole(data.role || 'worker'))
+        .then(data => setRole(data.role || 'admin'))
         .finally(() => setLoading(false));
     }
   }, [user]);
@@ -23,7 +24,7 @@ const DashboardHome = () => {
 
   if (role === 'buyer') return <BuyerHome />;
   if (role === 'worker') return <WorkerHome />;
-  if (role === 'admin') return <div className="text-center text-slate-500 py-12">Admin dashboard coming soon...</div>;
+  if (role === 'admin') return <AdminHome />;
   return <div className="text-center text-slate-500 py-12">Unknown role.</div>;
 };
 

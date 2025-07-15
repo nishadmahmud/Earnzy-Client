@@ -36,7 +36,7 @@ const DashboardLayout = () => {
     }
   }, [user]);
 
-  const role = userData?.role || 'worker';
+  const role = userData?.role || 'admin';
   const coins = userData?.coins ?? 0;
 
   let navLinks = workerLinks;
