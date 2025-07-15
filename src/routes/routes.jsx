@@ -7,6 +7,7 @@ import NotFound from "../pages/NotFound";
 import Dashboard from "../pages/Dashboard/Dashboard";
 import PrivateRoute from "../components/PrivateRoute";
 import BuyerHome from "../pages/Dashboard/Buyer/BuyerHome";
+import AddTask from "../pages/Dashboard/Buyer/AddTask";
 
 const router = createBrowserRouter([
   {
@@ -26,7 +27,7 @@ const router = createBrowserRouter([
       { path: "tasks", element: <div>TaskList (Worker)</div> },
       { path: "submissions", element: <div>My Submissions (Worker)</div> },
       { path: "withdrawals", element: <div>Withdrawals (Worker)</div> },
-      { path: "add-task", element: <div>Add new Tasks (Buyer)</div> },
+      { path: "add-task", element: <AddTask /> },
       { path: "my-tasks", element: <div>My Task's (Buyer)</div> },
       { path: "purchase-coin", element: <div>Purchase Coin (Buyer)</div> },
       { path: "payment-history", element: <div>Payment history (Buyer)</div> },
