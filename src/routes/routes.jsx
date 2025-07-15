@@ -15,6 +15,7 @@ import WorkerHome from "../pages/Dashboard/Wroker/WorkerHome";
 import WorkerTaskList from "../pages/Dashboard/Wroker/WorkerTaskList";
 import WorkerTaskDetails from "../pages/Dashboard/Wroker/WorkerTaskDetails";
 import WorkerMySubmissions from "../pages/Dashboard/Wroker/WorkerMySubmissions";
+import WorkerWithdrawals from "../pages/Dashboard/Wroker/WorkerWithdrawals";
 import DashboardHome from "../pages/Dashboard/DashboardHome";
 
 const router = createBrowserRouter([
@@ -35,7 +36,7 @@ const router = createBrowserRouter([
       { path: "tasks", element: <WorkerTaskList /> },
       { path: "tasks/:id", element: <WorkerTaskDetails /> },
       { path: "submissions", element: <WorkerMySubmissions /> },
-      { path: "withdrawals", element: <div>Withdrawals (Worker)</div> },
+      { path: "withdrawals", element: <WorkerWithdrawals /> },
       { path: "add-task", element: <AddTask /> },
       { path: "my-tasks", element: <MyTasks /> },
       { path: "purchase-coin", element: <PurchaseCoin /> },
