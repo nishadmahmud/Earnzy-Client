@@ -8,6 +8,9 @@ import Dashboard from "../pages/Dashboard/Dashboard";
 import PrivateRoute from "../components/PrivateRoute";
 import BuyerHome from "../pages/Dashboard/Buyer/BuyerHome";
 import AddTask from "../pages/Dashboard/Buyer/AddTask";
+import MyTasks from "../pages/Dashboard/Buyer/MyTasks";
+import PurchaseCoin from "../pages/Dashboard/Buyer/PurchaseCoin";
+import PaymentHistory from "../pages/Dashboard/Buyer/PaymentHistory";
 
 const router = createBrowserRouter([
   {
@@ -28,9 +31,9 @@ const router = createBrowserRouter([
       { path: "submissions", element: <div>My Submissions (Worker)</div> },
       { path: "withdrawals", element: <div>Withdrawals (Worker)</div> },
       { path: "add-task", element: <AddTask /> },
-      { path: "my-tasks", element: <div>My Task's (Buyer)</div> },
-      { path: "purchase-coin", element: <div>Purchase Coin (Buyer)</div> },
-      { path: "payment-history", element: <div>Payment history (Buyer)</div> },
+      { path: "my-tasks", element: <MyTasks /> },
+      { path: "purchase-coin", element: <PurchaseCoin /> },
+      { path: "payment-history", element: <PaymentHistory /> },
       { path: "manage-users", element: <div>Manage Users (Admin)</div> },
       { path: "manage-tasks", element: <div>Manage Task (Admin)</div> },
     ],
