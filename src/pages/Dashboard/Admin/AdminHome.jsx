@@ -1,170 +1,199 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
+import { useAdminDashboard, usePendingWithdrawals, useApproveWithdrawal } from '../../../hooks/useAdminData';
+import { FiUsers, FiShoppingCart, FiDollarSign, FiCreditCard, FiCheckCircle, FiClock } from 'react-icons/fi';
+import toast from 'react-hot-toast';
 
 const AdminHome = () => {
-  const [stats, setStats] = useState({
-    totalWorkers: 0,
-    totalBuyers: 0,
-    totalCoins: 0,
-    totalPayments: 0,
-  });
-  const [requests, setRequests] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [success, setSuccess] = useState('');
-  const [error, setError] = useState('');
+  const { data: stats, isLoading: statsLoading, error: statsError } = useAdminDashboard();
+  const { data: withdrawals = [], isLoading: withdrawalsLoading, error: withdrawalsError } = usePendingWithdrawals();
+  const approveWithdrawal = useApproveWithdrawal();
 
-  useEffect(() => {
-    // Fetch stats and withdraw requests in parallel
-    const fetchAll = async () => {
-      setLoading(true);
-      try {
-        // Placeholder: Fetch stats
-        // const statsRes = await fetch('http://localhost:5000/admin/stats');
-        // const statsData = await statsRes.json();
-        // setStats(statsData);
-        setStats({
-          totalWorkers: 12,
-          totalBuyers: 8,
-          totalCoins: 3200,
-          totalPayments: 1200,
-        });
-        // Placeholder: Fetch withdraw requests
-        // const reqRes = await fetch('http://localhost:5000/admin/withdrawals?status=pending');
-        // const reqData = await reqRes.json();
-        // setRequests(reqData);
-        setRequests([
-          {
-            _id: '1',
-            user: { name: 'Alice', email: 'alice@example.com' },
-            amount: 400,
-            paymentSystem: 'Bkash',
-            accountNumber: '017XXXXXXXX',
-            requestedAt: '2024-07-01',
-            status: 'pending',
-          },
-          {
-            _id: '2',
-            user: { name: 'Bob', email: 'bob@example.com' },
-            amount: 250,
-            paymentSystem: 'Nagad',
-            accountNumber: '018XXXXXXXX',
-            requestedAt: '2024-07-02',
-            status: 'pending',
-          },
-        ]);
-      } catch {
-        setStats({ totalWorkers: 0, totalBuyers: 0, totalCoins: 0, totalPayments: 0 });
-        setRequests([]);
-        setError('Failed to fetch admin data.');
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchAll();
-  }, []);
-
-  const handleApprove = async (requestId) => {
-    setSuccess('');
-    setError('');
+  const handleApprove = async (withdrawalId) => {
     try {
-      // Placeholder: Update withdrawal status and decrease user coins
-      // await fetch(`http://localhost:5000/admin/withdrawals/${requestId}/approve`, { method: 'PUT' })
-      setRequests(reqs => reqs.filter(r => r._id !== requestId));
-      setSuccess('Withdrawal approved and user coins updated.');
-    } catch {
-      setError('Failed to approve withdrawal.');
+      await approveWithdrawal.mutateAsync(withdrawalId);
+      toast.success('Withdrawal approved successfully!');
+    } catch (error) {
+      toast.error(error.message || 'Failed to approve withdrawal');
     }
   };
 
-  if (loading) {
-    return <div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div></div>;
+  const formatDate = (dateString) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
+  };
+
+  if (statsLoading || withdrawalsLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+  if (statsError || withdrawalsError) {
+    return (
+      <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+        <p className="text-red-600">
+          {statsError?.message || withdrawalsError?.message || 'Error loading admin data'}
+        </p>
+      </div>
+    );
   }
 
   return (
-    <div className="space-y-10">
+    <div className="space-y-8">
+
       {/* Stats Section */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <div className="bg-white p-6 rounded-lg shadow-sm border border-slate-100">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-slate-600">Total Workers</p>
-              <p className="text-2xl font-bold text-slate-800">{stats.totalWorkers}</p>
+              <p className="text-3xl font-bold text-slate-800">{stats?.totalWorkers || 0}</p>
             </div>
             <div className="p-3 bg-blue-50 rounded-full">
-              <span className="text-blue-600 font-bold text-lg">W</span>
+              <FiUsers className="h-6 w-6 text-blue-600" />
             </div>
           </div>
         </div>
+
         <div className="bg-white p-6 rounded-lg shadow-sm border border-slate-100">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-slate-600">Total Buyers</p>
-              <p className="text-2xl font-bold text-slate-800">{stats.totalBuyers}</p>
+              <p className="text-3xl font-bold text-slate-800">{stats?.totalBuyers || 0}</p>
             </div>
             <div className="p-3 bg-yellow-50 rounded-full">
-              <span className="text-yellow-600 font-bold text-lg">B</span>
+              <FiShoppingCart className="h-6 w-6 text-yellow-600" />
             </div>
           </div>
         </div>
+
         <div className="bg-white p-6 rounded-lg shadow-sm border border-slate-100">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-slate-600">Total Coins</p>
-              <p className="text-2xl font-bold text-slate-800">{stats.totalCoins}</p>
+              <p className="text-sm font-medium text-slate-600">Total Available Coins</p>
+              <p className="text-3xl font-bold text-slate-800">{stats?.totalAvailableCoins || 0}</p>
             </div>
             <div className="p-3 bg-green-50 rounded-full">
-              <span className="text-green-600 font-bold text-lg">C</span>
+              <FiDollarSign className="h-6 w-6 text-green-600" />
             </div>
           </div>
         </div>
+
         <div className="bg-white p-6 rounded-lg shadow-sm border border-slate-100">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-slate-600">Total Payments</p>
-              <p className="text-2xl font-bold text-slate-800">${stats.totalPayments}</p>
+              <p className="text-3xl font-bold text-slate-800">${stats?.totalPayments || 0}</p>
             </div>
             <div className="p-3 bg-purple-50 rounded-full">
-              <span className="text-purple-600 font-bold text-lg">$</span>
+              <FiCreditCard className="h-6 w-6 text-purple-600" />
             </div>
           </div>
         </div>
       </div>
 
       {/* Withdraw Requests Section */}
-      <div className="max-w-5xl mx-auto bg-white p-6 rounded-xl shadow-md border border-slate-100">
-        <h2 className="text-2xl font-bold text-slate-800 mb-6 text-center">Pending Withdraw Requests</h2>
-        {error && <div className="mb-3 text-red-600 text-sm text-center">{error}</div>}
-        {success && <div className="mb-3 text-green-600 text-sm text-center">{success}</div>}
-        {requests.length === 0 ? (
-          <div className="text-center text-slate-500 py-12">No pending withdrawal requests.</div>
+      <div className="bg-white rounded-lg shadow-sm border border-slate-100 overflow-hidden">
+        <div className="p-6 border-b border-slate-200">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-xl font-semibold text-slate-800">Pending Withdrawal Requests</h2>
+              <p className="text-sm text-slate-600 mt-1">
+                {withdrawals.length} pending request{withdrawals.length !== 1 ? 's' : ''}
+              </p>
+            </div>
+            <div className="flex items-center space-x-2">
+              <FiClock className="h-5 w-5 text-yellow-500" />
+              <span className="text-sm text-slate-600">Awaiting approval</span>
+            </div>
+          </div>
+        </div>
+
+        {withdrawals.length === 0 ? (
+          <div className="p-12 text-center">
+            <FiCheckCircle className="h-16 w-16 text-slate-300 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-slate-600 mb-2">No Pending Requests</h3>
+            <p className="text-slate-500">All withdrawal requests have been processed.</p>
+          </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-slate-50">
+              <thead className="bg-slate-50 border-b border-slate-200">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">User</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Email</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Amount (Coins)</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Payment System</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Account</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Requested At</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Action</th>
+                  <th className="px-6 py-4 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                    Worker Details
+                  </th>
+                  <th className="px-6 py-4 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                    Amount
+                  </th>
+                  <th className="px-6 py-4 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                    Payment System
+                  </th>
+                  <th className="px-6 py-4 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                    Account Number
+                  </th>
+                  <th className="px-6 py-4 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                    Requested Date
+                  </th>
+                  <th className="px-6 py-4 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                    Action
+                  </th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-slate-100">
-                {requests.map(req => (
-                  <tr key={req._id} className="hover:bg-slate-50">
-                    <td className="px-6 py-4 whitespace-nowrap">{req.user.name}</td>
-                    <td className="px-6 py-4 whitespace-nowrap">{req.user.email}</td>
-                    <td className="px-6 py-4 whitespace-nowrap font-bold text-blue-700">{req.amount}</td>
-                    <td className="px-6 py-4 whitespace-nowrap">{req.paymentSystem}</td>
-                    <td className="px-6 py-4 whitespace-nowrap">{req.accountNumber}</td>
-                    <td className="px-6 py-4 whitespace-nowrap">{req.requestedAt}</td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+              <tbody className="bg-white divide-y divide-slate-200">
+                {withdrawals.map((withdrawal) => (
+                  <tr key={withdrawal._id} className="hover:bg-slate-50 transition-colors">
+                    <td className="px-6 py-4">
+                      <div className="flex items-center">
+                        <FiUsers className="h-4 w-4 text-slate-400 mr-2" />
+                        <div>
+                          <p className="text-sm font-medium text-slate-900">{withdrawal.workerName}</p>
+                          <p className="text-xs text-slate-500">{withdrawal.workerEmail}</p>
+                        </div>
+                      </div>
+                    </td>
+                    
+                    <td className="px-6 py-4">
+                      <div>
+                        <p className="text-sm font-semibold text-slate-900">{withdrawal.withdrawalCoin} coins</p>
+                        <p className="text-xs text-green-600">${withdrawal.withdrawalAmount}</p>
+                      </div>
+                    </td>
+                    
+                    <td className="px-6 py-4">
+                      <span className="text-sm text-slate-900 capitalize">{withdrawal.paymentSystem}</span>
+                    </td>
+                    
+                    <td className="px-6 py-4">
+                      <span className="text-sm text-slate-600 font-mono">{withdrawal.accountNumber}</span>
+                    </td>
+                    
+                    <td className="px-6 py-4">
+                      <span className="text-sm text-slate-900">{formatDate(withdrawal.withdrawDate)}</span>
+                    </td>
+                    
+                    <td className="px-6 py-4">
                       <button
-                        className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-md font-semibold shadow-sm transition-colors"
-                        onClick={() => handleApprove(req._id)}
+                        onClick={() => handleApprove(withdrawal._id)}
+                        disabled={approveWithdrawal.isPending}
+                        className="inline-flex items-center px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        Payment Success
+                        {approveWithdrawal.isPending ? (
+                          <>
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                            Processing...
+                          </>
+                        ) : (
+                          <>
+                            <FiCheckCircle className="h-4 w-4 mr-2" />
+                            Payment Success
+                          </>
+                        )}
                       </button>
                     </td>
                   </tr>
@@ -174,6 +203,21 @@ const AdminHome = () => {
           </div>
         )}
       </div>
+
+      {/* Summary Footer */}
+      {withdrawals.length > 0 && (
+        <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-slate-600">
+              Total pending withdrawals: {withdrawals.length}
+            </span>
+            <span className="text-slate-600">
+              Total amount: {withdrawals.reduce((sum, w) => sum + w.withdrawalCoin, 0)} coins 
+              (${withdrawals.reduce((sum, w) => sum + w.withdrawalAmount, 0)})
+            </span>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
