@@ -1,5 +1,6 @@
-import React, { useContext, useEffect, useState } from 'react';
+import React, { useContext, useState } from 'react';
 import { AuthContext } from '../../../auth/AuthProvider';
+import { useUserCoins } from '../../../hooks/useUserData';
 
 const paymentSystems = [
   'Bkash',
@@ -14,26 +15,13 @@ const MIN_WITHDRAW_COIN = 200;
 
 const WorkerWithdrawals = () => {
   const { user } = useContext(AuthContext);
-  const [userCoins, setUserCoins] = useState(0);
+  const { coins: userCoins } = useUserCoins();
   const [withdrawCoin, setWithdrawCoin] = useState(MIN_WITHDRAW_COIN);
   const [paymentSystem, setPaymentSystem] = useState(paymentSystems[0]);
   const [accountNumber, setAccountNumber] = useState('');
   const [success, setSuccess] = useState('');
   const [error, setError] = useState('');
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    // Fetch worker's available coins
-    if (user?.email) {
-      fetch(`http://localhost:5000/users?email=${encodeURIComponent(user.email)}`)
-        .then(res => res.json())
-        .then(data => {
-          setUserCoins(data.coins || 0);
-          setWithdrawCoin(Math.max(MIN_WITHDRAW_COIN, Math.min(data.coins || 0, MIN_WITHDRAW_COIN)));
-        })
-        .finally(() => setLoading(false));
-    }
-  }, [user]);
+          
 
   const withdrawAmount = (withdrawCoin && withdrawCoin >= MIN_WITHDRAW_COIN) ? (withdrawCoin / COIN_TO_DOLLAR) : 0;
 
@@ -65,14 +53,9 @@ const WorkerWithdrawals = () => {
     // Placeholder: Save withdrawal to server
     // await fetch('http://localhost:5000/withdrawals', { ... })
     setSuccess('Withdrawal request submitted!');
-    setUserCoins(c => c - withdrawCoin);
     setWithdrawCoin(MIN_WITHDRAW_COIN);
     setAccountNumber('');
   };
-
-  if (loading) {
-    return <div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div></div>;
-  }
 
   return (
     <div className="max-w-xl mx-auto bg-white p-8 rounded-xl shadow-md border border-slate-100 mt-4">

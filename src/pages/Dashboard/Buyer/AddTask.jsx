@@ -1,9 +1,12 @@
 import React, { useState, useContext } from 'react';
 import { AuthContext } from '../../../auth/AuthProvider';
 import { useNavigate } from 'react-router';
+import { useUserCoins, useRefreshUserCoins } from '../../../hooks/useUserData';
 
 const AddTask = () => {
   const { user } = useContext(AuthContext);
+  const { coins } = useUserCoins();
+  const refreshUserCoins = useRefreshUserCoins();
   const [form, setForm] = useState({
     title: '',
     detail: '',
@@ -17,19 +20,8 @@ const AddTask = () => {
   const [imagePreview, setImagePreview] = useState(null);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const [userCoins, setUserCoins] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const navigate = useNavigate();
-
-  React.useEffect(() => {
-    // Fetch buyer's available coins
-    if (user?.email) {
-      fetch(`http://localhost:5000/users?email=${encodeURIComponent(user.email)}`)
-        .then(res => res.json())
-        .then(data => setUserCoins(data.coins || 0))
-        .catch(err => console.error('Error fetching user data:', err));
-    }
-  }, [user]);
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -112,7 +104,7 @@ const AddTask = () => {
     
     const totalPayable = Number(form.requiredWorkers) * Number(form.payableAmount);
     
-    if (totalPayable > userCoins) {
+    if (totalPayable > coins) {
       alert('Not available Coin. Purchase Coin');
       navigate('/dashboard/purchase-coin');
       setSubmitting(false);
@@ -143,7 +135,7 @@ const AddTask = () => {
       
       if (response.ok) {
         setSuccess('Task added successfully!');
-        setUserCoins(data.remainingCoins);
+        refreshUserCoins();
         
         // Reset form
         setForm({
@@ -373,7 +365,7 @@ const AddTask = () => {
         
         <div className="flex items-center justify-between mt-6 pt-4 border-t border-slate-200">
           <div className="text-slate-600 text-sm">
-            <div className="font-medium">Available Coins: {userCoins}</div>
+            <div className="font-medium">Available Coins: {coins}</div>
             <div className="font-medium text-blue-600">
               Total Payable: {form.requiredWorkers && form.payableAmount ? Number(form.requiredWorkers) * Number(form.payableAmount) : 0} coins
             </div>

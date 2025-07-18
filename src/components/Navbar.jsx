@@ -3,14 +3,16 @@ import { Link, useLocation, useNavigate } from 'react-router';
 import { FiMenu, FiX, FiGithub, FiChevronDown, FiLogOut, FiUser, FiDollarSign } from 'react-icons/fi';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AuthContext } from '../auth/AuthProvider';
+import { useUserData, useUserCoins } from '../hooks/useUserData';
 
 const Navbar = () => {
     const [isOpen, setIsOpen] = useState(false);
     const [dropdownOpen, setDropdownOpen] = useState(false);
-    const [userData, setUserData] = useState(null);
     const location = useLocation();
     const navigate = useNavigate();
     const { user, logOut } = useContext(AuthContext);
+    const { data: userData } = useUserData();
+    const { coins } = useUserCoins();
     const dropdownRef = useRef(null);
 
     const navItems = [
@@ -20,33 +22,12 @@ const Navbar = () => {
 
     const isActive = (path) => location.pathname === path;
 
-    // Fetch user data when user is logged in
-    useEffect(() => {
-        if (user?.email) {
-            fetch(`http://localhost:5000/users?email=${encodeURIComponent(user.email)}`)
-                .then(res => res.json())
-                .then(data => {
-                    if (data.error) {
-                        console.error('Error fetching user data:', data.error);
-                        setUserData(null);
-                    } else {
-                        setUserData(data);
-                    }
-                })
-                .catch(err => {
-                    console.error('Error fetching user data:', err);
-                    setUserData(null);
-                });
-        } else {
-            setUserData(null);
-        }
-    }, [user]);
+
 
     // Handle logout
     const handleLogout = async () => {
         await logOut();
         setDropdownOpen(false);
-        setUserData(null);
         navigate('/');
     };
 
@@ -122,7 +103,7 @@ const Navbar = () => {
                                         <div className="flex items-center space-x-1 bg-slate-100 px-3 py-1 rounded-full">
                                             <FiDollarSign className="h-4 w-4 text-green-600" />
                                             <span className="text-sm font-medium text-slate-700">
-                                                {userData.coins || 0}
+                                                {coins || 0}
                                             </span>
                                         </div>
                                         {/* Role Badge */}
@@ -248,7 +229,7 @@ const Navbar = () => {
                                             <div className="flex items-center space-x-1 bg-slate-100 px-2 py-1 rounded-full">
                                                 <FiDollarSign className="h-3 w-3 text-green-600" />
                                                 <span className="text-xs font-medium text-slate-700">
-                                                    {userData.coins || 0}
+                                                    {coins || 0}
                                                 </span>
                                             </div>
                                             <div className="px-2 py-1 bg-blue-100 text-blue-700 text-xs font-medium rounded-full capitalize">

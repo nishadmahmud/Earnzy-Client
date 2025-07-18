@@ -1,8 +1,9 @@
-import React, { useContext, useEffect, useState } from 'react';
+import React, { useContext } from 'react';
 import { AuthContext } from '../../auth/AuthProvider';
 import Footer from '../../components/Footer';
 import { FiBell } from 'react-icons/fi';
 import { Link, Outlet } from 'react-router';
+import { useUserData, useUserCoins } from '../../hooks/useUserData';
 
 const workerLinks = [
   { name: 'Home', path: '/dashboard' },
@@ -25,19 +26,10 @@ const adminLinks = [
 
 const DashboardLayout = () => {
   const { user } = useContext(AuthContext);
-  const [userData, setUserData] = useState(null);
-
-  useEffect(() => {
-    if (user?.email) {
-      fetch(`http://localhost:5000/users?email=${encodeURIComponent(user.email)}`)
-        .then(res => res.json())
-        .then(data => setUserData(data))
-        .catch(() => setUserData(null));
-    }
-  }, [user]);
+  const { data: userData } = useUserData();
+  const { coins } = useUserCoins();
 
   const role = userData?.role || 'admin';
-  const coins = userData?.coins ?? 0;
 
   let navLinks = workerLinks;
   if (role === 'buyer') navLinks = buyerLinks;
