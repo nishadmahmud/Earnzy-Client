@@ -3,6 +3,7 @@ import { AuthContext } from '../../../auth/AuthProvider';
 import PaymentForm from '../../../components/PaymentForm';
 import toast from 'react-hot-toast';
 import { useUserCoins, useRefreshUserCoins } from '../../../hooks/useUserData';
+import { useRefreshNotifications } from '../../../hooks/useNotifications';
 
 const COIN_PACKAGES = [
   { coins: 10, price: 1 },
@@ -15,6 +16,7 @@ const PurchaseCoin = () => {
   const { user } = useContext(AuthContext);
   const { coins } = useUserCoins();
   const refreshUserCoins = useRefreshUserCoins();
+  const refreshNotifications = useRefreshNotifications();
   const [selectedPackage, setSelectedPackage] = useState(null);
   const [showPaymentForm, setShowPaymentForm] = useState(false);
 
@@ -27,6 +29,8 @@ const PurchaseCoin = () => {
     console.log('PurchaseCoin: Payment success data:', data);
     // Invalidate and refetch user coins to update the UI
     refreshUserCoins();
+    // Refresh notifications to show the purchase notification
+    refreshNotifications();
     setShowPaymentForm(false);
     setSelectedPackage(null);
     toast.success(`Payment successful! You purchased ${data.coinsAdded} coins.`);

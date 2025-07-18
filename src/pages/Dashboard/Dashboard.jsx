@@ -1,9 +1,9 @@
 import React, { useContext } from 'react';
 import { AuthContext } from '../../auth/AuthProvider';
 import Footer from '../../components/Footer';
-import { FiBell } from 'react-icons/fi';
 import { Link, Outlet } from 'react-router';
 import { useUserData, useUserCoins } from '../../hooks/useUserData';
+import NotificationDropdown from '../../components/NotificationDropdown';
 
 const workerLinks = [
   { name: 'Home', path: '/dashboard' },
@@ -59,9 +59,7 @@ const DashboardLayout = () => {
             alt="User"
             className="w-10 h-10 rounded-full object-cover border border-slate-200"
           />
-          <button className="ml-4 p-2 rounded-full hover:bg-slate-100 text-slate-600 relative">
-            <FiBell className="h-6 w-6" />
-          </button>
+          <NotificationDropdown />
         </div>
       </div>
       {/* Main Content with Sidebar */}

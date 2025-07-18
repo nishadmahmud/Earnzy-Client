@@ -4,6 +4,7 @@ import { FiMenu, FiX, FiGithub, FiChevronDown, FiLogOut, FiUser, FiDollarSign } 
 import { motion, AnimatePresence } from 'framer-motion';
 import { AuthContext } from '../auth/AuthProvider';
 import { useUserData, useUserCoins } from '../hooks/useUserData';
+import NotificationDropdown from './NotificationDropdown';
 
 const Navbar = () => {
     const [isOpen, setIsOpen] = useState(false);
@@ -110,6 +111,8 @@ const Navbar = () => {
                                         <div className="px-2 py-1 bg-blue-100 text-blue-700 text-xs font-medium rounded-full capitalize">
                                             {userData.role || 'user'}
                                         </div>
+                                        {/* Notifications */}
+                                        <NotificationDropdown />
                                     </div>
                                 )}
                                 
