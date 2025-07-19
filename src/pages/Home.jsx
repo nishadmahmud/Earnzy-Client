@@ -197,7 +197,7 @@ const Home = () => {
   return (
     <div className="min-h-screen">
       {/* Hero Section with Slider */}
-      <section className="relative h-screen overflow-hidden">
+      <section className="relative h-[90vh] overflow-hidden">
         <Swiper
           modules={[Autoplay, EffectFade]}
           effect="fade"

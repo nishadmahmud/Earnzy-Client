@@ -1,6 +1,7 @@
 import React, { useState, useContext, useRef, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
-import { FiMenu, FiX, FiGithub, FiChevronDown, FiLogOut, FiUser, FiDollarSign } from 'react-icons/fi';
+import { FiMenu, FiX, FiGithub, FiChevronDown, FiLogOut, FiUser } from 'react-icons/fi';
+import { HiOutlineCurrencyDollar } from 'react-icons/hi2';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AuthContext } from '../auth/AuthProvider';
 import { useUserData, useUserCoins, useUserProfile } from '../hooks/useUserData';
@@ -23,6 +24,7 @@ const Navbar = () => {
     ];
 
     const isActive = (path) => location.pathname === path;
+    const isHomePage = location.pathname === '/';
 
 
 
@@ -98,64 +100,86 @@ const Navbar = () => {
                             </>
                         ) : (
                             <>
-                                {/* User Info Section */}
-                                {userData && (
-                                    <div className="flex items-center space-x-4">
-                                        {/* Coins Display */}
-                                        <div className="flex items-center space-x-1 bg-slate-100 px-3 py-1 rounded-full">
-                                            <FiDollarSign className="h-4 w-4 text-green-600" />
-                                            <span className="text-sm font-medium text-slate-700">
-                                                {coins || 0}
+                                {/* User Info Section - Reorganized Layout */}
+                                <div className="flex items-center space-x-4">
+                                    {/* User Name with Role and Coin above */}
+                                    {userData && (
+                                        <div className="flex flex-col items-end">
+                                            {/* Role and Coin on top */}
+                                            <div className="flex items-center space-x-2 mb-1">
+                                                <div className="flex items-center space-x-1 bg-slate-100 px-2 py-0.5 rounded-full">
+                                                    <HiOutlineCurrencyDollar className="h-3 w-3 text-yellow-600" />
+                                                    <span className="text-xs font-medium text-slate-700">
+                                                        {coins || 0}
+                                                    </span>
+                                                </div>
+                                                <div className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-medium rounded-full capitalize">
+                                                    {userData.role || 'user'}
+                                                </div>
+                                            </div>
+                                            {/* User Name below */}
+                                            <span className="text-sm font-medium text-slate-700 max-w-[120px] truncate">
+                                                {userData?.name || user.displayName || 'User'}
                                             </span>
                                         </div>
-                                        {/* Role Badge */}
-                                        <div className="px-2 py-1 bg-blue-100 text-blue-700 text-xs font-medium rounded-full capitalize">
-                                            {userData.role || 'user'}
-                                        </div>
-                                        {/* Notifications */}
-                                        <NotificationDropdown />
+                                    )}
+                                    
+                                    {/* User Profile Image */}
+                                    <div className="relative" ref={dropdownRef}>
+                                        <button
+                                            onClick={() => setDropdownOpen((prev) => !prev)}
+                                            className="flex items-center space-x-2 px-2 py-2 rounded-md text-sm font-medium text-slate-700 hover:text-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        >
+                                            <img
+                                                src={userProfile.profileImage}
+                                                alt="User"
+                                                className="w-10 h-10 rounded-full object-cover border border-slate-200"
+                                            />
+                                                                                        <FiChevronDown className="ml-1" />
+                                        </button>
+                                        <AnimatePresence>
+                                            {dropdownOpen && (
+                                                <motion.div
+                                                    initial={{ opacity: 0, y: -10 }}
+                                                    animate={{ opacity: 1, y: 0 }}
+                                                    exit={{ opacity: 0, y: -10 }}
+                                                    className="absolute right-0 mt-2 w-44 bg-white border border-slate-200 rounded-lg shadow-lg py-2 z-50"
+                                                >
+                                                    <Link
+                                                        to="/dashboard"
+                                                        className="flex items-center px-4 py-2 text-slate-700 hover:bg-slate-100 hover:text-blue-600 transition-colors text-sm"
+                                                        onClick={() => setDropdownOpen(false)}
+                                                    >
+                                                        <FiUser className="mr-2" /> Dashboard
+                                                    </Link>
+                                                    <button
+                                                        onClick={handleLogout}
+                                                        className="flex items-center w-full px-4 py-2 text-slate-700 hover:bg-slate-100 hover:text-blue-600 transition-colors text-sm"
+                                                    >
+                                                        <FiLogOut className="mr-2" /> Logout
+                                                    </button>
+                                                </motion.div>
+                                            )}
+                                        </AnimatePresence>
                                     </div>
-                                )}
-                                
-                                <div className="relative" ref={dropdownRef}>
-                                    <button
-                                        onClick={() => setDropdownOpen((prev) => !prev)}
-                                        className="flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium text-slate-700 hover:text-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    >
-                                        <img
-                                            src={userProfile.profileImage}
-                                            alt="User"
-                                            className="w-8 h-8 rounded-full object-cover border border-slate-200"
-                                        />
-                                        <span className="hidden md:inline font-medium max-w-[120px] truncate">
-                                            {userData?.name || user.displayName || 'User'}
-                                        </span>
-                                        <FiChevronDown className="ml-1" />
-                                    </button>
-                                    <AnimatePresence>
-                                        {dropdownOpen && (
-                                            <motion.div
-                                                initial={{ opacity: 0, y: -10 }}
-                                                animate={{ opacity: 1, y: 0 }}
-                                                exit={{ opacity: 0, y: -10 }}
-                                                className="absolute right-0 mt-2 w-44 bg-white border border-slate-200 rounded-lg shadow-lg py-2 z-50"
-                                            >
-                                                <Link
-                                                    to="/dashboard"
-                                                    className="flex items-center px-4 py-2 text-slate-700 hover:bg-slate-100 hover:text-blue-600 transition-colors text-sm"
-                                                    onClick={() => setDropdownOpen(false)}
-                                                >
-                                                    <FiUser className="mr-2" /> Dashboard
-                                                </Link>
-                                                <button
-                                                    onClick={handleLogout}
-                                                    className="flex items-center w-full px-4 py-2 text-slate-700 hover:bg-slate-100 hover:text-blue-600 transition-colors text-sm"
-                                                >
-                                                    <FiLogOut className="mr-2" /> Logout
-                                                </button>
-                                            </motion.div>
-                                        )}
-                                    </AnimatePresence>
+                                    
+                                    {/* Notifications */}
+                                    <NotificationDropdown />
+                                    
+                                    {/* Join as Developer button - Always show on home page */}
+                                    {isHomePage && (
+                                        <motion.a
+                                            href="https://github.com/nishadmahmud/Earnzy-Client"
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            whileHover={{ scale: 1.05 }}
+                                            whileTap={{ scale: 0.95 }}
+                                            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-200 shadow-sm"
+                                        >
+                                            <FiGithub className="mr-2 h-4 w-4" />
+                                            Join as Developer
+                                        </motion.a>
+                                    )}
                                 </div>
                             </>
                         )}
@@ -217,29 +241,50 @@ const Navbar = () => {
                                     </motion.a>
                                 </>
                             ) : (
-                                <div className="px-3 py-2 space-y-2">
-                                    <div className="flex items-center gap-2">
-                                        <img
-                                            src={userProfile.profileImage}
-                                            alt="User"
-                                            className="w-8 h-8 rounded-full object-cover border border-slate-200"
-                                        />
-                                        <span className="font-medium max-w-[120px] truncate">
-                                            {userData?.name || user.displayName || 'User'}
-                                        </span>
-                                    </div>
-                                    {userData && (
-                                        <div className="flex items-center space-x-2">
-                                            <div className="flex items-center space-x-1 bg-slate-100 px-2 py-1 rounded-full">
-                                                <FiDollarSign className="h-3 w-3 text-green-600" />
-                                                <span className="text-xs font-medium text-slate-700">
-                                                    {coins || 0}
+                                <div className="px-3 py-2 space-y-3">
+                                    {/* User Info Section - Mobile */}
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-3">
+                                            <img
+                                                src={userProfile.profileImage}
+                                                alt="User"
+                                                className="w-10 h-10 rounded-full object-cover border border-slate-200"
+                                            />
+                                            <div className="flex flex-col">
+                                                {userData && (
+                                                    <div className="flex items-center space-x-2 mb-1">
+                                                        <div className="flex items-center space-x-1 bg-slate-100 px-2 py-0.5 rounded-full">
+                                                            <HiOutlineCurrencyDollar className="h-3 w-3 text-yellow-600" />
+                                                            <span className="text-xs font-medium text-slate-700">
+                                                                {coins || 0}
+                                                            </span>
+                                                        </div>
+                                                        <div className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-medium rounded-full capitalize">
+                                                            {userData.role || 'user'}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                                <span className="text-sm font-medium text-slate-700 max-w-[120px] truncate">
+                                                    {userData?.name || user.displayName || 'User'}
                                                 </span>
                                             </div>
-                                            <div className="px-2 py-1 bg-blue-100 text-blue-700 text-xs font-medium rounded-full capitalize">
-                                                {userData.role || 'user'}
-                                            </div>
                                         </div>
+                                        {/* Notifications in mobile */}
+                                        <NotificationDropdown />
+                                    </div>
+                                    {/* Show Join as Developer button on home page even when logged in */}
+                                    {isHomePage && (
+                                        <motion.a
+                                            href="https://github.com/nishadmahmud/Earnzy-Client"
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            onClick={() => setIsOpen(false)}
+                                            whileTap={{ scale: 0.95 }}
+                                            className="block mt-2 mx-0 px-3 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-200 shadow-sm text-center"
+                                        >
+                                            <FiGithub className="inline mr-2 h-4 w-4" />
+                                            Join as Developer
+                                        </motion.a>
                                     )}
                                     <button
                                         onClick={handleLogout}
