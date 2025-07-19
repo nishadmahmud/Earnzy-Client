@@ -2,7 +2,7 @@ import React, { useContext } from 'react';
 import { AuthContext } from '../../auth/AuthProvider';
 import Footer from '../../components/Footer';
 import { Link, Outlet } from 'react-router';
-import { useUserData, useUserCoins } from '../../hooks/useUserData';
+import { useUserData, useUserCoins, useUserProfile } from '../../hooks/useUserData';
 import NotificationDropdown from '../../components/NotificationDropdown';
 
 const workerLinks = [
@@ -28,6 +28,7 @@ const DashboardLayout = () => {
   const { user } = useContext(AuthContext);
   const { data: userData } = useUserData();
   const { coins } = useUserCoins();
+  const userProfile = useUserProfile();
 
   const role = userData?.role || 'admin';
 
@@ -55,7 +56,7 @@ const DashboardLayout = () => {
             <span className="font-semibold text-slate-800 max-w-[120px] truncate">{user?.displayName || 'User'}</span>
           </div>
           <img
-            src={user?.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.displayName || 'User')}`}
+            src={userProfile.profileImage}
             alt="User"
             className="w-10 h-10 rounded-full object-cover border border-slate-200"
           />

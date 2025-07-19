@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router';
 import { FiMenu, FiX, FiGithub, FiChevronDown, FiLogOut, FiUser, FiDollarSign } from 'react-icons/fi';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AuthContext } from '../auth/AuthProvider';
-import { useUserData, useUserCoins } from '../hooks/useUserData';
+import { useUserData, useUserCoins, useUserProfile } from '../hooks/useUserData';
 import NotificationDropdown from './NotificationDropdown';
 
 const Navbar = () => {
@@ -14,6 +14,7 @@ const Navbar = () => {
     const { user, logOut } = useContext(AuthContext);
     const { data: userData } = useUserData();
     const { coins } = useUserCoins();
+    const userProfile = useUserProfile();
     const dropdownRef = useRef(null);
 
     const navItems = [
@@ -122,7 +123,7 @@ const Navbar = () => {
                                         className="flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium text-slate-700 hover:text-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
                                     >
                                         <img
-                                            src={user.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.displayName || 'User')}`}
+                                            src={userProfile.profileImage}
                                             alt="User"
                                             className="w-8 h-8 rounded-full object-cover border border-slate-200"
                                         />
@@ -219,7 +220,7 @@ const Navbar = () => {
                                 <div className="px-3 py-2 space-y-2">
                                     <div className="flex items-center gap-2">
                                         <img
-                                            src={user.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.displayName || 'User')}`}
+                                            src={userProfile.profileImage}
                                             alt="User"
                                             className="w-8 h-8 rounded-full object-cover border border-slate-200"
                                         />

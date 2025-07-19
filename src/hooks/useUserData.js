@@ -43,6 +43,19 @@ export const useUserCoins = () => {
   };
 };
 
+export const useUserProfile = () => {
+  const { user } = useContext(AuthContext);
+  const { data: dbUser } = useUserData();
+  
+  return {
+    name: dbUser?.name || user?.displayName || user?.email?.split('@')[0] || 'User',
+    email: user?.email || '',
+    profileImage: dbUser?.profilePic || user?.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(dbUser?.name || user?.displayName || 'User')}`,
+    role: dbUser?.role || 'worker',
+    coins: dbUser?.coins || 0,
+  };
+};
+
 export const useRefreshUserCoins = () => {
   const queryClient = useQueryClient();
   const { user } = useContext(AuthContext);

@@ -170,10 +170,10 @@ const ManageUsers = () => {
                     <td className="px-6 py-4">
                       <div className="flex items-center">
                         <div className="flex-shrink-0 h-10 w-10">
-                          {user.photoURL ? (
+                          {user.photoURL || user.profilePic ? (
                             <img
                               className="h-10 w-10 rounded-full object-cover"
-                              src={user.photoURL}
+                              src={user.photoURL || user.profilePic}
                               alt={user.name}
                             />
                           ) : (
