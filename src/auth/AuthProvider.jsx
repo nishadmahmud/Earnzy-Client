@@ -17,6 +17,23 @@ const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  // Function to get and store Firebase access token
+  const getAndStoreToken = async (user) => {
+    if (user) {
+      try {
+        const token = await user.getIdToken();
+        localStorage.setItem('firebaseAccessToken', token);
+        console.log('✅ Firebase access token stored in localStorage');
+      } catch (error) {
+        console.error('❌ Error getting Firebase token:', error);
+      }
+    } else {
+      // Remove token when user is null (logged out)
+      localStorage.removeItem('firebaseAccessToken');
+      console.log('🗑️ Firebase access token removed from localStorage');
+    }
+  };
+
   const createUser = (email, password) => {
     setLoading(true);
     return createUserWithEmailAndPassword(auth, email, password);
@@ -51,10 +68,18 @@ const AuthProvider = ({ children }) => {
     return sendPasswordResetEmail(auth, email).finally(() => setLoading(false));
   };
 
+  // Function to get stored token (useful for API calls)
+  const getStoredToken = () => {
+    return localStorage.getItem('firebaseAccessToken');
+  };
+
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setUser(user);
       setLoading(false);
+      
+      // Store or remove token based on auth state
+      await getAndStoreToken(user);
     });
     return () => unsubscribe();
   }, []);
@@ -68,6 +93,7 @@ const AuthProvider = ({ children }) => {
     logOut,
     updateUserProfile,
     sendPasswordReset,
+    getStoredToken, // Add this to the context
   };
 
   return <AuthContext.Provider value={authInfo}>{children}</AuthContext.Provider>;

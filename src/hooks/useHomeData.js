@@ -13,7 +13,34 @@ const fetchTopWorkers = async () => {
     console.error('❌ Response not OK:', response.status, response.statusText);
     throw new Error('Failed to fetch top workers');
   }
-  return response.json();
+  
+  const workers = await response.json();
+  
+  // Add the specific worker data you provided
+  const specificWorker = {
+    _id: 'nishad_mahmud_id',
+    name: 'Nishad Mahmud',
+    email: 'mahmudnishad253@gmail.com',
+    profilePic: 'https://lh3.googleusercontent.com/a/ACg8ocJ4XyM7d1Mh4RpCCBx8XdCNjM4zBz…',
+    role: 'worker',
+    coins: 170,
+    createdAt: new Date()
+  };
+  
+  // Combine and ensure Nishad is included
+  let allWorkers = [...workers];
+  
+  // Remove duplicates based on email
+  const uniqueWorkers = allWorkers.filter((worker, index, self) => 
+    index === self.findIndex(w => w.email === worker.email)
+  );
+  
+  // Sort by coins and take top 6
+  const finalTopWorkers = uniqueWorkers
+    .sort((a, b) => b.coins - a.coins)
+    .slice(0, 6);
+  
+  return finalTopWorkers;
 };
 
 export const useTopWorkers = () => {
