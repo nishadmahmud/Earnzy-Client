@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { AuthContext } from '../../../auth/AuthProvider';
-import { FiCreditCard, FiCalendar, FiDollarSign, FiCheckCircle, FiClock, FiChevronLeft, FiChevronRight, FiTarget } from 'react-icons/fi';
+import { FiCreditCard, FiCalendar, FiDollarSign, FiCheckCircle, FiClock, FiChevronLeft, FiChevronRight, FiTarget, FiBriefcase } from 'react-icons/fi';
 import { HiSparkles } from 'react-icons/hi2';
 import { motion } from 'framer-motion';
 import useDocumentTitle from '../../../hooks/useDocumentTitle';
@@ -17,21 +17,38 @@ const PaymentHistory = () => {
 
   useEffect(() => {
     if (user?.email) {
-      fetchPaymentHistory();
+      fetchCombinedPayments();
     }
   }, [user]);
 
-  const fetchPaymentHistory = async () => {
+  const fetchCombinedPayments = async () => {
+    setLoading(true);
     try {
-      setLoading(true);
-      const response = await fetch(`${import.meta.env.VITE_SERVER_URL}/payment-history?email=${encodeURIComponent(user.email)}`);
-      
-      if (response.ok) {
-        const data = await response.json();
-        setPayments(data);
-      } else {
-        toast.error('Failed to fetch payment history');
+      // Fetch coin purchases
+      const purchaseRes = await fetch(`${import.meta.env.VITE_SERVER_URL}/payment-history?email=${encodeURIComponent(user.email)}`);
+      let purchases = [];
+      if (purchaseRes.ok) {
+        purchases = await purchaseRes.json();
+        purchases = purchases.map(p => ({
+          ...p,
+          type: 'purchase',
+          date: new Date(p.date),
+        }));
       }
+      // Fetch task payments
+      const taskRes = await fetch(`${import.meta.env.VITE_SERVER_URL}/buyer/payments?email=${encodeURIComponent(user.email)}`);
+      let taskPayments = [];
+      if (taskRes.ok) {
+        taskPayments = await taskRes.json();
+        taskPayments = taskPayments.map(t => ({
+          ...t,
+          type: 'task',
+          date: new Date(t.date),
+        }));
+      }
+      // Combine and sort by date descending
+      const allPayments = [...purchases, ...taskPayments].sort((a, b) => new Date(b.date) - new Date(a.date));
+      setPayments(allPayments);
     } catch (error) {
       console.error('Error fetching payment history:', error);
       toast.error('Failed to fetch payment history');
@@ -47,11 +64,13 @@ const PaymentHistory = () => {
   const currentPayments = payments.slice(startIndex, endIndex);
 
   // Calculate stats
-  const totalSpent = payments.reduce((sum, payment) => sum + payment.amount, 0);
-  const totalCoins = payments.reduce((sum, payment) => sum + payment.coins, 0);
+  const totalSpent = payments.reduce((sum, payment) => sum + (payment.amount || 0), 0);
+  const totalCoins = payments.reduce((sum, payment) => sum + (payment.coins || 0), 0);
 
-  const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
+  const formatDate = (dateObj) => {
+    if (!dateObj) return '';
+    const d = new Date(dateObj);
+    return d.toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
@@ -103,7 +122,7 @@ const PaymentHistory = () => {
       textColor: 'text-emerald-600'
     },
     {
-      title: 'Coins Purchased',
+      title: 'Coins Used',
       value: `${totalCoins} coins`,
       icon: <FiTarget className="h-4 w-4" />,
       bgColor: 'bg-violet-50',
@@ -168,7 +187,7 @@ const PaymentHistory = () => {
               </motion.div>
               <div>
                 <h2 className="text-lg font-semibold text-slate-800">Payment History</h2>
-                <p className="text-xs text-slate-600">Your coin purchase transactions</p>
+                <p className="text-xs text-slate-600">All your coin purchases and task payments</p>
               </div>
             </div>
             
@@ -194,7 +213,7 @@ const PaymentHistory = () => {
               <FiCreditCard className="h-6 w-6 text-slate-400" />
             </motion.div>
             <h3 className="text-base font-semibold text-slate-600 mb-1">No Payments Yet</h3>
-            <p className="text-sm text-slate-500">Purchase coins to see your payment history</p>
+            <p className="text-sm text-slate-500">Purchase coins or create tasks to see your payment history</p>
           </motion.div>
         ) : (
           <>
@@ -202,7 +221,7 @@ const PaymentHistory = () => {
             <div className="divide-y divide-white/20">
                 {currentPayments.map((payment, index) => (
                   <motion.div
-                    key={`${payment.id}-${currentPage}`}
+                    key={`${payment.id || payment.taskId}-${currentPage}`}
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -10 }}
@@ -215,24 +234,26 @@ const PaymentHistory = () => {
                       <div className="flex items-center space-x-3">
                         <motion.div
                           whileHover={{ scale: 1.05 }}
-                          className="w-10 h-10 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl flex items-center justify-center shadow-sm"
+                          className={`w-10 h-10 ${payment.type === 'purchase' ? 'bg-gradient-to-br from-emerald-500 to-teal-600' : 'bg-gradient-to-br from-blue-500 to-indigo-600'} rounded-xl flex items-center justify-center shadow-sm`}
                         >
-                          <FiCheckCircle className="h-5 w-5 text-white" />
+                          {payment.type === 'purchase' ? (
+                            <FiCheckCircle className="h-5 w-5 text-white" />
+                          ) : (
+                            <FiBriefcase className="h-5 w-5 text-white" />
+                          )}
                         </motion.div>
-                        
                         <div className="space-y-1">
                           <div className="flex items-center space-x-2">
                             <h3 className="text-sm font-semibold text-slate-800">
-                              Coin Purchase
+                              {payment.type === 'purchase' ? 'Coin Purchase' : 'Task Payment'}
                             </h3>
                             <motion.span
                               whileHover={{ scale: 1.02 }}
-                              className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-gradient-to-r from-emerald-100 to-green-100 text-emerald-700 border border-emerald-200/50 shadow-sm"
+                              className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${payment.type === 'purchase' ? 'bg-gradient-to-r from-emerald-100 to-green-100 text-emerald-700 border border-emerald-200/50' : 'bg-gradient-to-r from-blue-100 to-indigo-100 text-blue-700 border border-blue-200/50'} shadow-sm`}
                             >
-                              Success
+                              {payment.type === 'purchase' ? 'Success' : (payment.title || 'Task')}
                             </motion.span>
                           </div>
-                          
                           <div className="flex items-center space-x-4 text-xs text-slate-600">
                             <div className="flex items-center space-x-1">
                               <FiTarget className="h-3 w-3 text-violet-600" />
@@ -245,14 +266,19 @@ const PaymentHistory = () => {
                           </div>
                         </div>
                       </div>
-                      
                       <div className="text-right space-y-1">
                         <div className="text-lg font-bold text-slate-800">
-                          ${payment.amount.toFixed(2)}
+                          {payment.type === 'purchase' ? (
+                            `$${payment.amount?.toFixed ? payment.amount.toFixed(2) : Number(payment.amount).toFixed(2)}`
+                          ) : (
+                            `${payment.coins} coins`
+                          )}
                         </div>
-                        <div className="text-xs text-slate-500">
-                          ${(payment.amount / payment.coins).toFixed(3)} per coin
-                        </div>
+                        {payment.type === 'purchase' && (
+                          <div className="text-xs text-slate-500">
+                            ${(payment.amount / payment.coins).toFixed(3)} per coin
+                          </div>
+                        )}
                       </div>
                     </div>
                   </motion.div>

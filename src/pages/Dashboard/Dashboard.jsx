@@ -113,15 +113,17 @@ const DashboardLayout = () => {
                   <div className="flex flex-col items-end">
                     {/* Role and Coin on top */}
                     <div className="flex items-center space-x-2 mb-1">
-                      <motion.div 
-                        whileHover={{ scale: 1.05 }}
-                        className="flex items-center space-x-1 bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200/50 px-2 py-1 rounded-full shadow-sm"
-                      >
-                        <HiOutlineCurrencyDollar className="h-3 w-3 text-amber-600" />
-                        <span className="text-xs font-semibold text-amber-700">
-                          {coins || 0}
-                        </span>
-                      </motion.div>
+                      {userData.role !== 'admin' && (
+                        <motion.div 
+                          whileHover={{ scale: 1.05 }}
+                          className="flex items-center space-x-1 bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200/50 px-2 py-1 rounded-full shadow-sm"
+                        >
+                          <HiOutlineCurrencyDollar className="h-3 w-3 text-amber-600" />
+                          <span className="text-xs font-semibold text-amber-700">
+                            {coins || 0}
+                          </span>
+                        </motion.div>
+                      )}
                       <motion.div 
                         whileHover={{ scale: 1.05 }}
                         className="px-2 py-1 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200/50 text-blue-700 text-xs font-semibold rounded-full capitalize shadow-sm"
@@ -235,12 +237,14 @@ const DashboardLayout = () => {
                       <div className="flex flex-col">
                         {userData && (
                           <div className="flex items-center space-x-2 mb-1">
-                            <div className="flex items-center space-x-1 bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200/50 px-2 py-1 rounded-full">
-                              <HiOutlineCurrencyDollar className="h-3 w-3 text-amber-600" />
-                              <span className="text-xs font-semibold text-amber-700">
-                                {coins || 0}
-                              </span>
-                            </div>
+                            {userData.role !== 'admin' && (
+                              <div className="flex items-center space-x-1 bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200/50 px-2 py-1 rounded-full">
+                                <HiOutlineCurrencyDollar className="h-3 w-3 text-amber-600" />
+                                <span className="text-xs font-semibold text-amber-700">
+                                  {coins || 0}
+                                </span>
+                              </div>
+                            )}
                             <div className="px-2 py-1 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200/50 text-blue-700 text-xs font-semibold rounded-full capitalize">
                               {userData.role || 'user'}
                             </div>
@@ -469,10 +473,12 @@ const DashboardLayout = () => {
                   />
                   <div className="flex-1">
                     <div className="flex items-center space-x-2 mb-1">
-                      <div className="flex items-center space-x-1 bg-white/60 px-2 py-0.5 rounded-full border border-white/30">
-                        <HiOutlineCurrencyDollar className="h-3 w-3 text-emerald-600" />
-                        <span className="text-xs font-medium text-emerald-700">{coins || 0}</span>
-                      </div>
+                      {userData.role !== 'admin' && (
+                        <div className="flex items-center space-x-1 bg-white/60 px-2 py-0.5 rounded-full border border-white/30">
+                          <HiOutlineCurrencyDollar className="h-3 w-3 text-emerald-600" />
+                          <span className="text-xs font-medium text-emerald-700">{coins || 0}</span>
+                        </div>
+                      )}
                       <div className="px-2 py-0.5 bg-gradient-to-r from-blue-500 to-indigo-600 text-white text-xs font-medium rounded-full capitalize">
                         {userData?.role || 'user'}
                       </div>

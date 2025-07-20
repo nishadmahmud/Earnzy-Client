@@ -106,12 +106,14 @@ const Navbar = () => {
                                         <div className="flex flex-col items-end">
                                             {/* Role and Coin on top */}
                                             <div className="flex items-center space-x-2 mb-1">
-                                                <div className="flex items-center space-x-1 bg-white/50 backdrop-blur-md border border-emerald-200/50 px-2 py-0.5 rounded-full shadow-sm">
-                                                    <HiOutlineCurrencyDollar className="h-3 w-3 text-emerald-600" />
-                                                    <span className="text-xs font-medium text-emerald-700">
-                                                        {coins || 0}
-                                                    </span>
-                                                </div>
+                                                {userData.role !== 'admin' && (
+                                                    <div className="flex items-center space-x-1 bg-white/50 backdrop-blur-md border border-emerald-200/50 px-2 py-0.5 rounded-full shadow-sm">
+                                                        <HiOutlineCurrencyDollar className="h-3 w-3 text-emerald-600" />
+                                                        <span className="text-xs font-medium text-emerald-700">
+                                                            {coins || 0}
+                                                        </span>
+                                                    </div>
+                                                )}
                                                 <div className="px-2 py-0.5 bg-gradient-to-r from-blue-500/90 to-indigo-600/90 backdrop-blur-sm border border-white/20 text-white text-xs font-medium rounded-full capitalize shadow-sm">
                                                     {userData.role || 'user'}
                                                 </div>
@@ -280,12 +282,14 @@ const Navbar = () => {
                                             <div className="flex flex-col">
                                                 {userData && (
                                                     <div className="flex items-center space-x-2 mb-1">
-                                                        <div className="flex items-center space-x-1 bg-white/60 backdrop-blur-sm px-2 py-0.5 rounded-full border border-white/30">
-                                                            <HiOutlineCurrencyDollar className="h-3 w-3 text-emerald-600" />
-                                                            <span className="text-xs font-medium text-emerald-700">
-                                                                {coins || 0}
-                                                            </span>
-                                                        </div>
+                                                        {userData.role !== 'admin' && (
+                                                            <div className="flex items-center space-x-1 bg-white/60 backdrop-blur-sm px-2 py-0.5 rounded-full border border-white/30">
+                                                                <HiOutlineCurrencyDollar className="h-3 w-3 text-emerald-600" />
+                                                                <span className="text-xs font-medium text-emerald-700">
+                                                                    {coins || 0}
+                                                                </span>
+                                                            </div>
+                                                        )}
                                                         <div className="px-2 py-0.5 bg-gradient-to-r from-blue-500/90 to-indigo-600/90 backdrop-blur-sm border border-white/20 text-white text-xs font-medium rounded-full capitalize">
                                                             {userData.role || 'user'}
                                                         </div>
