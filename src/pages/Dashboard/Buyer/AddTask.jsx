@@ -2,6 +2,11 @@ import React, { useState, useContext } from 'react';
 import { AuthContext } from '../../../auth/AuthProvider';
 import { useNavigate } from 'react-router';
 import { useUserCoins, useRefreshUserCoins } from '../../../hooks/useUserData';
+import { FiPlus, FiImage, FiCalendar, FiUsers, FiDollarSign, FiFileText, FiUpload, FiTarget, FiInfo } from 'react-icons/fi';
+import { HiSparkles } from 'react-icons/hi2';
+import { motion } from 'framer-motion';
+import toast from 'react-hot-toast';
+import useDocumentTitle from '../../../hooks/useDocumentTitle';
 
 const AddTask = () => {
   const { user } = useContext(AuthContext);
@@ -18,15 +23,13 @@ const AddTask = () => {
   });
   const [imageUploading, setImageUploading] = useState(false);
   const [imagePreview, setImagePreview] = useState(null);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const navigate = useNavigate();
 
+  useDocumentTitle('Add New Task');
+
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
-    setError('');
-    setSuccess('');
   };
 
   const handleFileSelect = async (e) => {
@@ -38,17 +41,15 @@ const AddTask = () => {
 
     // Validate file type
     if (!file.type.startsWith('image/')) {
-      setError('Please select a valid image file');
+      toast.error('Please select a valid image file');
       return;
     }
 
     // Validate file size (5MB limit)
     if (file.size > 5 * 1024 * 1024) {
-      setError('Image size should be less than 5MB');
+      toast.error('Image size should be less than 5MB');
       return;
     }
-
-    setError('');
 
     // Create preview
     const reader = new FileReader();
@@ -57,330 +58,425 @@ const AddTask = () => {
     };
     reader.readAsDataURL(file);
 
-    // Automatically upload to Cloudinary
+    // Upload to ImgBB
     setImageUploading(true);
-    
-    const formData = new FormData();
-    formData.append('image', file);
-    
     try {
-      const res = await fetch('http://localhost:5000/upload-image', {
+      const formData = new FormData();
+      formData.append('image', file);
+
+      const response = await fetch(`https://api.imgbb.com/1/upload?key=${import.meta.env.VITE_IMGBB_API_KEY}`, {
         method: 'POST',
         body: formData,
       });
-      
-      const data = await res.json();
+
+      const data = await response.json();
       
       if (data.success) {
-        setForm(f => ({ ...f, imageUrl: data.imageUrl }));
-        setSuccess('Image uploaded successfully!');
+        setForm({ ...form, imageUrl: data.data.url });
+        toast.success('Image uploaded successfully!');
       } else {
-        setError(data.error || 'Image upload failed.');
+        throw new Error('Upload failed');
       }
-    } catch (err) {
-      console.error('Upload error:', err);
-      setError('Image upload failed.');
+    } catch (error) {
+      console.error('Image upload error:', error);
+      toast.error('Failed to upload image. Please try again.');
+      setImagePreview(null);
     } finally {
       setImageUploading(false);
     }
   };
 
-
-
-  const clearImage = () => {
+  const removeImage = () => {
+    setForm({ ...form, imageUrl: '' });
     setImagePreview(null);
-    setForm(f => ({ ...f, imageUrl: '' }));
+  };
+
+  const validateForm = () => {
+    const requiredFields = ['title', 'detail', 'requiredWorkers', 'payableAmount', 'completionDate', 'submissionInfo'];
     
-    // Clear file input
-    const fileInput = document.querySelector('input[type="file"]');
-    if (fileInput) fileInput.value = '';
+    for (const field of requiredFields) {
+      if (!form[field].trim()) {
+        toast.error(`Please fill in the ${field.replace(/([A-Z])/g, ' $1').toLowerCase()}`);
+        return false;
+      }
+    }
+
+    const workers = parseInt(form.requiredWorkers);
+    const payment = parseInt(form.payableAmount);
+    
+    if (workers < 1 || workers > 100) {
+      toast.error('Number of workers must be between 1 and 100');
+      return false;
+    }
+
+    if (payment < 1) {
+      toast.error('Payment amount must be at least 1 coin');
+      return false;
+    }
+
+    const totalCost = workers * payment;
+    if (totalCost > coins) {
+      toast.error(`Insufficient coins. You need ${totalCost} coins but have ${coins}`);
+      return false;
+    }
+
+    const selectedDate = new Date(form.completionDate);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    if (selectedDate <= today) {
+      toast.error('Completion date must be in the future');
+      return false;
+    }
+
+    return true;
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
-    setSuccess('');
-    setSubmitting(true);
     
-    const totalPayable = Number(form.requiredWorkers) * Number(form.payableAmount);
-    
-    if (totalPayable > coins) {
-      alert('Not available Coin. Purchase Coin');
-      navigate('/dashboard/purchase-coin');
-      setSubmitting(false);
+    if (!validateForm()) {
       return;
     }
-    
+
+    setSubmitting(true);
+
     try {
       const taskData = {
-        title: form.title,
-        detail: form.detail,
-        requiredWorkers: form.requiredWorkers,
-        payableAmount: form.payableAmount,
-        completionDate: form.completionDate,
-        submissionInfo: form.submissionInfo,
-        imageUrl: form.imageUrl,
-        buyerEmail: user.email
+        ...form,
+        buyerEmail: user.email,
+        buyerName: user.displayName || user.name || user.email,
+        requiredWorkers: parseInt(form.requiredWorkers),
+        payableAmount: parseInt(form.payableAmount),
+        totalPayable: parseInt(form.requiredWorkers) * parseInt(form.payableAmount),
+        status: 'active',
+        postedAt: new Date().toISOString(),
       };
-      
-      const response = await fetch('http://localhost:5000/tasks', {
+
+      const response = await fetch(`${import.meta.env.VITE_SERVER_URL}/tasks`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(taskData),
       });
-      
-      const data = await response.json();
-      
+
       if (response.ok) {
-        setSuccess('Task added successfully!');
-        refreshUserCoins();
-        
-        // Reset form
-        setForm({
-          title: '',
-          detail: '',
-          requiredWorkers: '',
-          payableAmount: '',
-          completionDate: '',
-          submissionInfo: '',
-          imageUrl: '',
-        });
-        
-        // Clear image states
-        clearImage();
-        
+        toast.success('Task created successfully!');
+        await refreshUserCoins();
+        navigate('/dashboard/my-tasks');
       } else {
-        setError(data.error || 'Failed to create task');
+        const errorData = await response.json();
+        toast.error(errorData.error || 'Failed to create task');
       }
-    } catch (err) {
-      console.error('Task creation error:', err);
-      setError('Failed to create task. Please try again.');
+    } catch (error) {
+      console.error('Error creating task:', error);
+      toast.error('Error creating task. Please try again.');
     } finally {
       setSubmitting(false);
     }
   };
 
+  const fadeInUp = {
+    initial: { opacity: 0, y: 15 },
+    animate: { opacity: 1, y: 0 },
+    transition: { duration: 0.4, ease: "easeOut" }
+  };
+
+  const staggerContainer = {
+    initial: {},
+    animate: {
+      transition: {
+        staggerChildren: 0.05
+      }
+    }
+  };
+
+  const totalCost = form.requiredWorkers && form.payableAmount ? 
+    parseInt(form.requiredWorkers) * parseInt(form.payableAmount) : 0;
+
   return (
-    <div className="max-w-2xl mx-auto bg-white p-8 rounded-xl shadow-md border border-slate-100 mt-4">
-      <h2 className="text-2xl font-bold text-slate-800 mb-6 text-center">Add New Task</h2>
-      
-      {error && (
-        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md">
-          <div className="text-red-600 text-sm">{error}</div>
-        </div>
-      )}
-      
-      {success && (
-        <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-md">
-          <div className="text-green-600 text-sm">{success}</div>
-        </div>
-      )}
-      
-      <form className="space-y-4" onSubmit={handleSubmit}>
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">Task Title</label>
-          <input
-            type="text"
-            name="title"
-            value={form.title}
-            onChange={handleChange}
-            required
-            className="w-full px-4 py-2 border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-800 bg-slate-50"
-            placeholder="e.g. Watch my YouTube video and make a comment"
-          />
-        </div>
-        
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">Task Detail</label>
-          <textarea
-            name="detail"
-            value={form.detail}
-            onChange={handleChange}
-            required
-            rows={3}
-            className="w-full px-4 py-2 border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-800 bg-slate-50"
-            placeholder="Detailed description of the task"
-          />
-        </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Required Workers</label>
-            <input
-              type="number"
-              name="requiredWorkers"
-              value={form.requiredWorkers}
-              onChange={handleChange}
-              required
-              min={1}
-              className="w-full px-4 py-2 border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-800 bg-slate-50"
-              placeholder="e.g. 100"
-            />
+    <motion.div
+      initial="initial"
+      animate="animate"
+      variants={staggerContainer}
+      className="space-y-4"
+    >
+      {/* Header */}
+      <motion.div
+        variants={fadeInUp}
+        className="bg-white/60 backdrop-blur-xl rounded-2xl border border-white/50 p-4 shadow-lg"
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <motion.div
+              whileHover={{ scale: 1.05 }}
+              className="w-8 h-8 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl flex items-center justify-center shadow-sm"
+            >
+              <FiPlus className="h-4 w-4 text-white" />
+            </motion.div>
+            <div>
+              <h1 className="text-xl font-bold text-slate-800">Create New Task</h1>
+              <p className="text-sm text-slate-600">Post a task for workers to complete</p>
+            </div>
           </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Payable Amount (per worker)</label>
-            <input
-              type="number"
-              name="payableAmount"
-              value={form.payableAmount}
-              onChange={handleChange}
-              required
-              min={1}
-              className="w-full px-4 py-2 border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-800 bg-slate-50"
-              placeholder="e.g. 10"
-            />
+          <div className="flex items-center space-x-2 bg-blue-50/60 backdrop-blur-sm px-3 py-2 rounded-xl border border-blue-200/50">
+            <FiDollarSign className="h-4 w-4 text-blue-600" />
+            <span className="text-sm font-bold text-blue-700">{coins} coins</span>
           </div>
         </div>
-        
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">Completion Date</label>
-          <input
-            type="date"
-            name="completionDate"
-            value={form.completionDate}
-            onChange={handleChange}
-            required
-            className="w-full px-4 py-2 border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-800 bg-slate-50"
-          />
-        </div>
-        
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">Submission Info</label>
-          <input
-            type="text"
-            name="submissionInfo"
-            value={form.submissionInfo}
-            onChange={handleChange}
-            required
-            className="w-full px-4 py-2 border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-800 bg-slate-50"
-            placeholder="e.g. Screenshot, proof, etc."
-          />
-        </div>
-        
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">Task Image</label>
+      </motion.div>
+
+      {/* Form */}
+      <motion.div
+        variants={fadeInUp}
+        className="bg-white/60 backdrop-blur-xl rounded-2xl border border-white/50 p-4 shadow-lg"
+      >
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Basic Information */}
           <div className="space-y-3">
-            {/* URL Input */}
-            <input
-              type="text"
-              name="imageUrl"
-              value={form.imageUrl}
-              onChange={handleChange}
-              className="w-full px-4 py-2 border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-800 bg-slate-50"
-              placeholder="Paste image URL or upload from device"
-            />
+            <h3 className="text-base font-semibold text-slate-800 flex items-center">
+              <FiFileText className="h-4 w-4 mr-2 text-blue-600" />
+              Basic Information
+            </h3>
             
-            {/* File Upload Section */}
-            <div className="border-2 border-dashed border-slate-300 rounded-lg p-4">
-              <div className="text-center">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">
+                  Task Title *
+                </label>
+                <input
+                  type="text"
+                  name="title"
+                  value={form.title}
+                  onChange={handleChange}
+                  placeholder="Enter task title"
+                  className="w-full px-3 py-2 bg-white/60 backdrop-blur-sm border border-white/50 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 text-sm transition-all duration-200"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">
+                  Completion Date *
+                </label>
+                <div className="relative">
+                  <input
+                    type="date"
+                    name="completionDate"
+                    value={form.completionDate}
+                    onChange={handleChange}
+                    min={new Date(Date.now() + 86400000).toISOString().split('T')[0]}
+                    className="w-full px-3 py-2 bg-white/60 backdrop-blur-sm border border-white/50 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 text-sm transition-all duration-200"
+                    required
+                  />
+                  <FiCalendar className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-2">
+                Task Description *
+              </label>
+              <textarea
+                name="detail"
+                value={form.detail}
+                onChange={handleChange}
+                placeholder="Describe your task in detail..."
+                rows={3}
+                className="w-full px-3 py-2 bg-white/60 backdrop-blur-sm border border-white/50 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 text-sm transition-all duration-200 resize-none"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-2">
+                Submission Requirements *
+              </label>
+              <textarea
+                name="submissionInfo"
+                value={form.submissionInfo}
+                onChange={handleChange}
+                placeholder="What should workers submit as proof of completion?"
+                rows={2}
+                className="w-full px-3 py-2 bg-white/60 backdrop-blur-sm border border-white/50 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 text-sm transition-all duration-200 resize-none"
+                required
+              />
+            </div>
+          </div>
+
+          {/* Payment & Workers */}
+          <div className="space-y-3">
+            <h3 className="text-base font-semibold text-slate-800 flex items-center">
+              <FiDollarSign className="h-4 w-4 mr-2 text-emerald-600" />
+              Payment & Workers
+            </h3>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">
+                  Number of Workers *
+                </label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    name="requiredWorkers"
+                    value={form.requiredWorkers}
+                    onChange={handleChange}
+                    placeholder="1"
+                    min="1"
+                    max="100"
+                    className="w-full px-3 py-2 bg-white/60 backdrop-blur-sm border border-white/50 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500/50 text-sm transition-all duration-200"
+                    required
+                  />
+                  <FiUsers className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">
+                  Payment per Worker *
+                </label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    name="payableAmount"
+                    value={form.payableAmount}
+                    onChange={handleChange}
+                    placeholder="Amount in coins"
+                    min="1"
+                    className="w-full px-3 py-2 bg-white/60 backdrop-blur-sm border border-white/50 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500/50 text-sm transition-all duration-200"
+                    required
+                  />
+                  <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-sm text-slate-500 pointer-events-none">coins</span>
+                </div>
+              </div>
+            </div>
+
+            {totalCost > 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className={`p-3 rounded-xl border ${
+                  totalCost > coins 
+                    ? 'bg-red-50/60 border-red-200/50' 
+                    : 'bg-emerald-50/60 border-emerald-200/50'
+                }`}
+              >
+                <div className="flex items-center justify-between text-sm">
+                  <div className="flex items-center space-x-2">
+                    <FiInfo className={`h-4 w-4 ${totalCost > coins ? 'text-red-600' : 'text-emerald-600'}`} />
+                    <span className={`font-semibold ${totalCost > coins ? 'text-red-700' : 'text-emerald-700'}`}>
+                      Total Cost: {totalCost} coins
+                    </span>
+                  </div>
+                  <span className={`text-xs ${totalCost > coins ? 'text-red-600' : 'text-emerald-600'}`}>
+                    {totalCost > coins ? `Need ${totalCost - coins} more coins` : `${coins - totalCost} coins remaining`}
+                  </span>
+                </div>
+              </motion.div>
+            )}
+          </div>
+
+          {/* Image Upload */}
+          <div className="space-y-3">
+            <h3 className="text-base font-semibold text-slate-800 flex items-center">
+              <FiImage className="h-4 w-4 mr-2 text-violet-600" />
+              Task Image (Optional)
+            </h3>
+            
+            {!imagePreview ? (
+              <div className="border-2 border-dashed border-white/50 rounded-xl p-6 text-center bg-white/20 backdrop-blur-sm">
                 <input
                   type="file"
                   accept="image/*"
                   onChange={handleFileSelect}
                   className="hidden"
-                  id="image-upload"
+                  id="imageUpload"
                   disabled={imageUploading}
                 />
                 <label
-                  htmlFor="image-upload"
-                  className="cursor-pointer inline-flex items-center px-4 py-2 border border-slate-300 rounded-md shadow-sm text-sm font-medium text-slate-700 bg-white hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                  htmlFor="imageUpload"
+                  className="cursor-pointer flex flex-col items-center space-y-2"
                 >
-                  <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                  </svg>
-                  Choose Image
+                  <motion.div
+                    whileHover={{ scale: 1.05 }}
+                    className="w-12 h-12 bg-violet-100 rounded-xl flex items-center justify-center"
+                  >
+                    {imageUploading ? (
+                      <motion.div
+                        animate={{ rotate: 360 }}
+                        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                        className="w-6 h-6 border-2 border-violet-600/30 border-t-violet-600 rounded-full"
+                      />
+                    ) : (
+                      <FiUpload className="h-6 w-6 text-violet-600" />
+                    )}
+                  </motion.div>
+                  <div>
+                    <p className="text-sm font-semibold text-slate-700">
+                      {imageUploading ? 'Uploading...' : 'Upload Task Image'}
+                    </p>
+                    <p className="text-xs text-slate-500">PNG, JPG up to 5MB</p>
+                  </div>
                 </label>
-                <p className="text-xs text-slate-500 mt-1">PNG, JPG, GIF up to 5MB</p>
               </div>
-              
-                             {/* Image Preview */}
-               {imagePreview && (
-                 <div className="mt-4">
-                   <div className="relative inline-block">
-                     <img
-                       src={imagePreview}
-                       alt="Preview"
-                       className="max-w-full h-48 object-cover rounded-lg border border-slate-200"
-                     />
-                     {!imageUploading && (
-                       <button
-                         type="button"
-                         onClick={clearImage}
-                         className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition-colors"
-                       >
-                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                         </svg>
-                       </button>
-                     )}
-                     
-                     {/* Upload Progress Overlay */}
-                     {imageUploading && (
-                       <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center rounded-lg">
-                         <div className="text-white text-center">
-                           <svg className="animate-spin h-8 w-8 mx-auto mb-2" viewBox="0 0 24 24">
-                             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                           </svg>
-                           <p className="text-sm">Uploading...</p>
-                         </div>
-                       </div>
-                     )}
-                   </div>
-                   
-                   {/* Upload Status */}
-                   {form.imageUrl && !imageUploading && (
-                     <div className="mt-2 text-sm text-green-600 flex items-center">
-                       <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                       </svg>
-                       Image uploaded successfully!
-                     </div>
-                   )}
-                 </div>
-               )}
-            </div>
-            
-            {/* Display uploaded image from URL */}
-            {form.imageUrl && !imagePreview && (
-              <div className="mt-3">
+            ) : (
+              <div className="relative">
                 <img
-                  src={form.imageUrl}
-                  alt="Task"
-                  className="max-w-full h-48 object-cover rounded-lg border border-slate-200"
+                  src={imagePreview}
+                  alt="Task preview"
+                  className="w-full max-w-md h-48 object-cover rounded-xl shadow-sm"
                 />
-                <button
+                <motion.button
                   type="button"
-                  onClick={() => setForm(f => ({ ...f, imageUrl: '' }))}
-                  className="mt-2 text-sm text-red-600 hover:text-red-700"
+                  onClick={removeImage}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  className="absolute top-2 right-2 w-8 h-8 bg-red-600 text-white rounded-full flex items-center justify-center shadow-md hover:bg-red-700 transition-colors"
                 >
-                  Remove image
-                </button>
+                  ×
+                </motion.button>
               </div>
             )}
           </div>
-        </div>
-        
-        <div className="flex items-center justify-between mt-6 pt-4 border-t border-slate-200">
-          <div className="text-slate-600 text-sm">
-            <div className="font-medium">Available Coins: {coins}</div>
-            <div className="font-medium text-blue-600">
-              Total Payable: {form.requiredWorkers && form.payableAmount ? Number(form.requiredWorkers) * Number(form.payableAmount) : 0} coins
+
+          {/* Submit Button */}
+          <div className="flex items-center justify-between pt-4">
+            <div className="flex items-center space-x-2">
+              <HiSparkles className="h-4 w-4 text-emerald-600" />
+              <span className="text-sm text-slate-600">Ready to post your task?</span>
             </div>
+            
+            <motion.button
+              type="submit"
+              disabled={submitting || totalCost > coins}
+              whileHover={{ scale: submitting ? 1 : 1.02 }}
+              whileTap={{ scale: submitting ? 1 : 0.98 }}
+              className="flex items-center px-6 py-2 bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white font-semibold text-sm rounded-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-md hover:shadow-lg"
+            >
+              {submitting ? (
+                <>
+                  <motion.div
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                    className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full mr-2"
+                  />
+                  Creating Task...
+                </>
+              ) : (
+                <>
+                  <FiPlus className="h-4 w-4 mr-2" />
+                  Create Task
+                </>
+              )}
+            </motion.button>
           </div>
-          <button
-            type="submit"
-            className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-md shadow-sm transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
-            disabled={imageUploading || submitting}
-          >
-            {submitting ? 'Creating Task...' : 'Add Task'}
-          </button>
-        </div>
-      </form>
-    </div>
+        </form>
+      </motion.div>
+    </motion.div>
   );
 };
 
-export default AddTask; 
+export default AddTask;

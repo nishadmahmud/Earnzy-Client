@@ -5,7 +5,7 @@ import { AuthContext } from '../auth/AuthProvider';
 const fetchNotifications = async (email) => {
   if (!email) return [];
   
-  const response = await fetch(`http://localhost:5000/notifications?email=${encodeURIComponent(email)}`);
+  const response = await fetch(`${import.meta.env.VITE_SERVER_URL}/notifications?email=${encodeURIComponent(email)}`);
   if (!response.ok) {
     throw new Error('Failed to fetch notifications');
   }
@@ -14,7 +14,7 @@ const fetchNotifications = async (email) => {
 };
 
 const markAsRead = async (notificationId, userEmail) => {
-  const response = await fetch(`http://localhost:5000/notifications/${notificationId}/read`, {
+  const response = await fetch(`${import.meta.env.VITE_SERVER_URL}/notifications/${notificationId}/read`, {
     method: 'PUT',
     headers: {
       'Content-Type': 'application/json',
@@ -30,7 +30,7 @@ const markAsRead = async (notificationId, userEmail) => {
 };
 
 const markAllAsRead = async (userEmail) => {
-  const response = await fetch('http://localhost:5000/notifications/read-all', {
+  const response = await fetch(`${import.meta.env.VITE_SERVER_URL}/notifications/read-all`, {
     method: 'PUT',
     headers: {
       'Content-Type': 'application/json',
@@ -46,7 +46,7 @@ const markAllAsRead = async (userEmail) => {
 };
 
 const deleteNotification = async (notificationId, userEmail) => {
-  const response = await fetch(`http://localhost:5000/notifications/${notificationId}`, {
+  const response = await fetch(`${import.meta.env.VITE_SERVER_URL}/notifications/${notificationId}`, {
     method: 'DELETE',
     headers: {
       'Content-Type': 'application/json',

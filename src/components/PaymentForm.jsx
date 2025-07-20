@@ -17,7 +17,7 @@ const PaymentForm = ({ amount, coins, userEmail, onSuccess, onError, onCancel })
 
     try {
       // Create payment intent
-      const response = await fetch('http://localhost:5000/create-payment-intent', {
+      const response = await fetch(`${import.meta.env.VITE_SERVER_URL}/create-payment-intent`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -49,7 +49,7 @@ const PaymentForm = ({ amount, coins, userEmail, onSuccess, onError, onCancel })
         onError(result.error.message);
       } else {
         // Payment succeeded, confirm with backend
-        const confirmResponse = await fetch('http://localhost:5000/confirm-payment', {
+        const confirmResponse = await fetch(`${import.meta.env.VITE_SERVER_URL}/confirm-payment`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

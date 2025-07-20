@@ -19,6 +19,10 @@ import WorkerWithdrawals from "../pages/Dashboard/Wroker/WorkerWithdrawals";
 import DashboardHome from "../pages/Dashboard/DashboardHome";
 import ManageUsers from "../pages/Dashboard/Admin/ManageUsers";
 import ManageTasks from "../pages/Dashboard/Admin/ManageTasks";
+import About from "../pages/About";
+import Contact from "../pages/Contact";
+import Privacy from "../pages/Privacy";
+import Terms from "../pages/Terms";
 
 const router = createBrowserRouter([
   {
@@ -28,6 +32,10 @@ const router = createBrowserRouter([
       { path: "/", element: <Home /> },
       { path: "/login", element: <Login /> },
       { path: "/register", element: <Register /> },
+      { path: "/about", element: <About /> },
+      { path: "/contact", element: <Contact /> },
+      { path: "/privacy", element: <Privacy /> },
+      { path: "/terms", element: <Terms /> },
     ],
   },
   {

@@ -1,263 +1,414 @@
-import React, { useState } from 'react';
-import { useAllUsers, useUpdateUserRole, useDeleteUser } from '../../../hooks/useAdminData';
-import { FiUser, FiMail, FiDollarSign, FiTrash2, FiEdit, FiUsers } from 'react-icons/fi';
+import React, { useState, useEffect } from 'react';
+import { FiUsers, FiEdit, FiTrash2, FiMail, FiShield, FiTarget, FiStar, FiMoreVertical, FiCheck, FiX, FiEye } from 'react-icons/fi';
+import { HiSparkles } from 'react-icons/hi2';
+import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
+import useDocumentTitle from '../../../hooks/useDocumentTitle';
 
 const ManageUsers = () => {
-  const { data: users = [], isLoading, error } = useAllUsers();
-  const updateUserRole = useUpdateUserRole();
-  const deleteUser = useDeleteUser();
-  const [confirmDelete, setConfirmDelete] = useState(null);
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedRole, setSelectedRole] = useState('all');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [editingUser, setEditingUser] = useState(null);
+  const [newRole, setNewRole] = useState('');
 
-  const handleRoleChange = async (email, newRole) => {
+  useDocumentTitle('Manage Users');
+
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+
+  const fetchUsers = async () => {
     try {
-      await updateUserRole.mutateAsync({ email, role: newRole });
-      toast.success('User role updated successfully!');
+      setLoading(true);
+      const response = await fetch(`${import.meta.env.VITE_SERVER_URL}/admin/users`);
+      
+      if (response.ok) {
+        const data = await response.json();
+        setUsers(data);
+      } else {
+        toast.error('Failed to fetch users');
+      }
     } catch (error) {
-      toast.error(error.message || 'Failed to update user role');
+      console.error('Error fetching users:', error);
+      toast.error('Failed to fetch users');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleRemoveUser = async (email) => {
+  const handleRoleUpdate = async (email, role) => {
     try {
-      await deleteUser.mutateAsync(email);
-      toast.success('User removed successfully!');
-      setConfirmDelete(null);
+      const response = await fetch(`${import.meta.env.VITE_SERVER_URL}/admin/users/${email}/role`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ role }),
+      });
+
+      if (response.ok) {
+        toast.success('User role updated successfully!');
+        await fetchUsers();
+        setEditingUser(null);
+        setNewRole('');
+      } else {
+        const errorData = await response.json();
+        toast.error(errorData.error || 'Failed to update user role');
+      }
     } catch (error) {
-      toast.error(error.message || 'Failed to remove user');
+      console.error('Error updating user role:', error);
+      toast.error('Error updating user role');
     }
   };
+
+  const handleDeleteUser = async (email) => {
+    if (!window.confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`${import.meta.env.VITE_SERVER_URL}/admin/users/${email}`, {
+        method: 'DELETE',
+      });
+
+      if (response.ok) {
+        toast.success('User deleted successfully!');
+        await fetchUsers();
+      } else {
+        const errorData = await response.json();
+        toast.error(errorData.error || 'Failed to delete user');
+      }
+    } catch (error) {
+      console.error('Error deleting user:', error);
+      toast.error('Error deleting user');
+    }
+  };
+
+  const filteredUsers = users.filter(user => {
+    const matchesRole = selectedRole === 'all' || user.role === selectedRole;
+    const matchesSearch = user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         user.email.toLowerCase().includes(searchTerm.toLowerCase());
+    return matchesRole && matchesSearch;
+  });
 
   const getRoleColor = (role) => {
     switch (role) {
       case 'admin':
-        return 'bg-purple-100 text-purple-800 border-purple-200';
+        return 'bg-gradient-to-r from-red-100 to-pink-100 text-red-700 border-red-200/50';
       case 'buyer':
-        return 'bg-blue-100 text-blue-800 border-blue-200';
+        return 'bg-gradient-to-r from-blue-100 to-indigo-100 text-blue-700 border-blue-200/50';
       case 'worker':
-        return 'bg-green-100 text-green-800 border-green-200';
+        return 'bg-gradient-to-r from-emerald-100 to-green-100 text-emerald-700 border-emerald-200/50';
       default:
-        return 'bg-slate-100 text-slate-800 border-slate-200';
+        return 'bg-gradient-to-r from-slate-100 to-gray-100 text-slate-700 border-slate-200/50';
     }
   };
 
   const getRoleIcon = (role) => {
     switch (role) {
       case 'admin':
-        return '👑';
+        return <FiShield className="h-3 w-3" />;
       case 'buyer':
-        return '🛒';
+        return <FiTarget className="h-3 w-3" />;
       case 'worker':
-        return '⚡';
+        return <FiUsers className="h-3 w-3" />;
       default:
-        return '👤';
+        return <FiUsers className="h-3 w-3" />;
     }
   };
 
-  if (isLoading) {
+  const fadeInUp = {
+    initial: { opacity: 0, y: 15 },
+    animate: { opacity: 1, y: 0 },
+    transition: { duration: 0.4, ease: "easeOut" }
+  };
+
+  const staggerContainer = {
+    initial: {},
+    animate: {
+      transition: {
+        staggerChildren: 0.05
+      }
+    }
+  };
+
+  if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      <div className="flex items-center justify-center h-32">
+        <motion.div
+          animate={{ rotate: 360 }}
+          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+          className="w-8 h-8 border-3 border-blue-500/30 border-t-blue-500 rounded-full"
+        />
       </div>
     );
   }
 
-  if (error) {
-    return (
-      <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-        <p className="text-red-600">{error.message || 'Error loading users'}</p>
-      </div>
-    );
-  }
+  const userCounts = {
+    all: users.length,
+    admin: users.filter(u => u.role === 'admin').length,
+    buyer: users.filter(u => u.role === 'buyer').length,
+    worker: users.filter(u => u.role === 'worker').length
+  };
+
+  const statsCards = [
+    {
+      title: 'Total Users',
+      value: userCounts.all,
+      icon: <FiUsers className="h-4 w-4" />,
+      bgColor: 'bg-blue-50',
+      textColor: 'text-blue-600'
+    },
+    {
+      title: 'Admins',
+      value: userCounts.admin,
+      icon: <FiShield className="h-4 w-4" />,
+      bgColor: 'bg-red-50',
+      textColor: 'text-red-600'
+    },
+    {
+      title: 'Buyers',
+      value: userCounts.buyer,
+      icon: <FiTarget className="h-4 w-4" />,
+      bgColor: 'bg-indigo-50',
+      textColor: 'text-indigo-600'
+    },
+    {
+      title: 'Workers',
+      value: userCounts.worker,
+      icon: <FiStar className="h-4 w-4" />,
+      bgColor: 'bg-emerald-50',
+      textColor: 'text-emerald-600'
+    }
+  ];
 
   return (
-    <div className="space-y-6">
-            {/* Statistics */}
-            {users.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="bg-white p-6 rounded-lg shadow-sm border border-slate-100">
+    <motion.div
+      initial="initial"
+      animate="animate"
+      variants={staggerContainer}
+      className="space-y-4 overflow-x-hidden"
+    >
+      {/* Stats Section */}
+      <motion.div
+        variants={staggerContainer}
+        className="grid grid-cols-1 md:grid-cols-4 gap-3"
+      >
+        {statsCards.map((stat) => (
+          <motion.div
+            key={stat.title}
+            variants={fadeInUp}
+            whileHover={{ scale: 1.01, y: -1 }}
+            className="group bg-white/60 backdrop-blur-xl rounded-2xl border border-white/50 p-4 shadow-lg hover:shadow-xl transition-all duration-300"
+          >
             <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-slate-600">Total Users</p>
-                <p className="text-3xl font-bold text-slate-800">{users.length}</p>
-              </div>
-              <div className="p-3 bg-slate-50 rounded-full">
-                <FiUsers className="h-6 w-6 text-slate-600" />
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white p-6 rounded-lg shadow-sm border border-slate-100">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-slate-600">Admins</p>
-                <p className="text-3xl font-bold text-purple-600">
-                  {users.filter(u => u.role === 'admin').length}
+              <div className="space-y-1">
+                <p className="text-xs font-semibold text-slate-600 group-hover:text-slate-700 transition-colors">
+                  {stat.title}
+                </p>
+                <p className="text-lg font-bold text-slate-800 group-hover:text-slate-900 transition-colors">
+                  {stat.value}
                 </p>
               </div>
-              <div className="p-3 bg-purple-50 rounded-full">
-                <span className="text-2xl">👑</span>
+              <motion.div
+                whileHover={{ scale: 1.05 }}
+                className={`p-2 ${stat.bgColor} rounded-xl shadow-sm group-hover:shadow-md transition-all duration-300`}
+              >
+                <div className={stat.textColor}>
+                  {stat.icon}
+                </div>
+              </motion.div>
+            </div>
+          </motion.div>
+        ))}
+      </motion.div>
+
+      {/* Users Management */}
+      <motion.div
+        variants={fadeInUp}
+        className="bg-white/60 backdrop-blur-xl rounded-2xl border border-white/50 shadow-lg overflow-hidden"
+      >
+        <div className="px-4 py-3 border-b border-white/20 bg-gradient-to-r from-white/20 to-white/10">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between space-y-3 sm:space-y-0">
+            <div className="flex items-center space-x-2">
+              <motion.div
+                whileHover={{ scale: 1.05 }}
+                className="w-6 h-6 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center shadow-sm"
+              >
+                <FiUsers className="h-3 w-3 text-white" />
+              </motion.div>
+              <div>
+                <h2 className="text-lg font-semibold text-slate-800">User Management</h2>
+                <p className="text-xs text-slate-600">Manage all platform users</p>
               </div>
             </div>
-          </div>
 
-          <div className="bg-white p-6 rounded-lg shadow-sm border border-slate-100">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-slate-600">Buyers</p>
-                <p className="text-3xl font-bold text-blue-600">
-                  {users.filter(u => u.role === 'buyer').length}
-                </p>
-              </div>
-              <div className="p-3 bg-blue-50 rounded-full">
-                <span className="text-2xl">🛒</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white p-6 rounded-lg shadow-sm border border-slate-100">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-slate-600">Workers</p>
-                <p className="text-3xl font-bold text-green-600">
-                  {users.filter(u => u.role === 'worker').length}
-                </p>
-              </div>
-              <div className="p-3 bg-green-50 rounded-full">
-                <span className="text-2xl">⚡</span>
-              </div>
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-2">
+              {/* Search */}
+              <input
+                type="text"
+                placeholder="Search users..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="px-3 py-2 bg-white/60 backdrop-blur-sm border border-white/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/50 text-sm w-full sm:w-48"
+              />
+              
+              {/* Role Filter */}
+              <select
+                value={selectedRole}
+                onChange={(e) => setSelectedRole(e.target.value)}
+                className="px-3 py-2 bg-white/60 backdrop-blur-sm border border-white/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/50 text-sm"
+              >
+                <option value="all">All Roles</option>
+                <option value="admin">Admin</option>
+                <option value="buyer">Buyer</option>
+                <option value="worker">Worker</option>
+              </select>
             </div>
           </div>
         </div>
-      )}
 
-
-
-
-      {/* Users Table */}
-      <div className="bg-white rounded-lg shadow-sm border border-slate-100 overflow-hidden">
-        {users.length === 0 ? (
-          <div className="p-12 text-center">
-            <FiUsers className="h-16 w-16 text-slate-300 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-slate-600 mb-2">No Users Found</h3>
-            <p className="text-slate-500">No users are registered on the platform yet.</p>
-          </div>
+        {filteredUsers.length === 0 ? (
+          <motion.div
+            variants={fadeInUp}
+            className="p-8 text-center"
+          >
+            <motion.div
+              whileHover={{ scale: 1.05 }}
+              className="w-12 h-12 bg-slate-100 rounded-xl flex items-center justify-center mx-auto mb-3"
+            >
+              <FiUsers className="h-6 w-6 text-slate-400" />
+            </motion.div>
+            <h3 className="text-base font-semibold text-slate-600 mb-1">No Users Found</h3>
+            <p className="text-sm text-slate-500">Try adjusting your search or filter criteria</p>
+          </motion.div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-slate-50 border-b border-slate-200">
-                <tr>
-                  <th className="px-6 py-4 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
-                    User
-                  </th>
-                  <th className="px-6 py-4 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
-                    Email
-                  </th>
-                  <th className="px-6 py-4 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
-                    Role
-                  </th>
-                  <th className="px-6 py-4 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
-                    Coins
-                  </th>
-                  <th className="px-6 py-4 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-slate-200">
-                {users.map((user) => (
-                  <tr key={user._id} className="hover:bg-slate-50 transition-colors">
-                    <td className="px-6 py-4">
-                      <div className="flex items-center">
-                        <div className="flex-shrink-0 h-10 w-10">
-                          {user.photoURL || user.profilePic ? (
-                            <img
-                              className="h-10 w-10 rounded-full object-cover"
-                              src={user.photoURL || user.profilePic}
-                              alt={user.name}
-                            />
-                          ) : (
-                            <div className="h-10 w-10 rounded-full bg-slate-200 flex items-center justify-center">
-                              <FiUser className="h-5 w-5 text-slate-500" />
-                            </div>
-                          )}
-                        </div>
-                        <div className="ml-4">
-                          <div className="text-sm font-medium text-slate-900">{user.name}</div>
-                          <div className="text-sm text-slate-500">ID: {user._id}</div>
-                        </div>
-                      </div>
-                    </td>
+          <div className="p-2 sm:p-4">
+            <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-2 sm:gap-4">
+              {filteredUsers.map((user, index) => (
+              <motion.div
+                key={user._id}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.05 }}
+                className="bg-white/40 backdrop-blur-sm rounded-xl border border-white/50 p-3 sm:p-4 hover:bg-white/60 transition-all duration-200 shadow-sm hover:shadow-md"
+              >
+                {/* User Header */}
+                <div className="flex items-start justify-between mb-2 sm:mb-3">
+                  <div className="flex items-center space-x-2 sm:space-x-3 flex-1 min-w-0">
+                    <motion.img
+                      whileHover={{ scale: 1.05 }}
+                      className="h-8 w-8 sm:h-10 sm:w-10 rounded-xl shadow-sm flex-shrink-0"
+                      src={user.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&size=40`}
+                      alt={user.name}
+                    />
                     
-                    <td className="px-6 py-4">
-                      <div className="flex items-center">
-                        <FiMail className="h-4 w-4 text-slate-400 mr-2" />
-                        <span className="text-sm text-slate-900">{user.email}</span>
-                      </div>
-                    </td>
-                    
-                    <td className="px-6 py-4">
-                      <div className="flex items-center space-x-2">
-                        <span className="text-lg">{getRoleIcon(user.role)}</span>
-                        <select
-                          value={user.role}
-                          onChange={(e) => handleRoleChange(user.email, e.target.value)}
-                          disabled={updateUserRole.isPending}
-                          className={`px-3 py-1 rounded-full text-xs font-medium border ${getRoleColor(user.role)} focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50`}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center space-x-2 mb-1">
+                        <h3 className="text-sm sm:text-base font-semibold text-slate-800 truncate">{user.name}</h3>
+                        <motion.span
+                          whileHover={{ scale: 1.02 }}
+                          className={`inline-flex items-center px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full text-xs font-semibold border shadow-sm flex-shrink-0 ${getRoleColor(user.role)}`}
                         >
-                          <option value="admin">Admin</option>
-                          <option value="buyer">Buyer</option>
-                          <option value="worker">Worker</option>
-                        </select>
+                          {getRoleIcon(user.role)}
+                          <span className="ml-1 capitalize">{user.role}</span>
+                        </motion.span>
                       </div>
-                    </td>
-                    
-                    <td className="px-6 py-4">
-                      <div className="flex items-center">
-                        <FiDollarSign className="h-4 w-4 text-green-500 mr-1" />
-                        <span className="text-sm font-semibold text-green-600">{user.coins}</span>
+                      
+                      <div className="flex items-center space-x-1 text-xs sm:text-sm text-slate-600">
+                        <FiMail className="h-3 w-3 flex-shrink-0" />
+                        <span className="truncate">{user.email}</span>
                       </div>
-                    </td>
-                    
-                    <td className="px-6 py-4">
-                      <div className="flex items-center space-x-2">
-                        {confirmDelete === user.email ? (
-                          <div className="flex items-center space-x-2">
-                            <button
-                              onClick={() => handleRemoveUser(user.email)}
-                              disabled={deleteUser.isPending}
-                              className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-xs font-medium rounded transition-colors disabled:opacity-50"
-                            >
-                              {deleteUser.isPending ? 'Deleting...' : 'Confirm'}
-                            </button>
-                            <button
-                              onClick={() => setConfirmDelete(null)}
-                              className="px-3 py-1 bg-slate-300 hover:bg-slate-400 text-slate-700 text-xs font-medium rounded transition-colors"
-                            >
-                              Cancel
-                            </button>
-                          </div>
-                        ) : (
-                          <button
-                            onClick={() => setConfirmDelete(user.email)}
-                            className="inline-flex items-center px-3 py-1 bg-red-100 hover:bg-red-200 text-red-700 text-xs font-medium rounded transition-colors"
-                          >
-                            <FiTrash2 className="h-3 w-3 mr-1" />
-                            Remove
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                    </div>
+                  </div>
+                </div>
+
+                {/* User Stats */}
+                <div className="bg-white/60 rounded-lg p-2 sm:p-3 mb-2 sm:mb-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <HiSparkles className="h-3 w-3 sm:h-4 sm:w-4 text-amber-600" />
+                      <span className="text-xs sm:text-sm font-semibold text-amber-600">{user.coins || 0} coins</span>
+                    </div>
+                    <div className="text-xs text-slate-500">
+                      Joined {new Date(user.createdAt).toLocaleDateString()}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex items-center justify-end space-x-1 sm:space-x-2">
+                  {editingUser === user.email ? (
+                    <div className="flex items-center space-x-1 sm:space-x-2 w-full">
+                      <select
+                        value={newRole}
+                        onChange={(e) => setNewRole(e.target.value)}
+                        className="flex-1 px-2 sm:px-3 py-1.5 sm:py-2 bg-white/60 backdrop-blur-sm border border-white/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/50 text-xs sm:text-sm"
+                      >
+                        <option value="">Select Role</option>
+                        <option value="admin">Admin</option>
+                        <option value="buyer">Buyer</option>
+                        <option value="worker">Worker</option>
+                      </select>
+                      
+                      <motion.button
+                        onClick={() => handleRoleUpdate(user.email, newRole)}
+                        disabled={!newRole}
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        className="px-2 sm:px-3 py-1.5 sm:py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <FiCheck className="h-3 w-3 sm:h-4 sm:w-4" />
+                      </motion.button>
+                      
+                      <motion.button
+                        onClick={() => {
+                          setEditingUser(null);
+                          setNewRole('');
+                        }}
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        className="px-2 sm:px-3 py-1.5 sm:py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors shadow-sm"
+                      >
+                        <FiX className="h-3 w-3 sm:h-4 sm:w-4" />
+                      </motion.button>
+                    </div>
+                  ) : (
+                    <>
+                      <motion.button
+                        onClick={() => {
+                          setEditingUser(user.email);
+                          setNewRole(user.role);
+                        }}
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        className="flex items-center space-x-1 px-2 sm:px-3 py-1.5 sm:py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors shadow-sm"
+                      >
+                        <FiEdit className="h-3 w-3 sm:h-4 sm:w-4" />
+                        <span className="text-xs sm:text-sm font-medium">Edit</span>
+                      </motion.button>
+                      
+                      <motion.button
+                        onClick={() => handleDeleteUser(user.email)}
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        className="flex items-center space-x-1 px-2 sm:px-3 py-1.5 sm:py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors shadow-sm"
+                      >
+                        <FiTrash2 className="h-3 w-3 sm:h-4 sm:w-4" />
+                        <span className="text-xs sm:text-sm font-medium">Delete</span>
+                      </motion.button>
+                    </>
+                  )}
+                </div>
+              </motion.div>
+            ))}
+            </div>
           </div>
         )}
-      </div>
-
-
-    </div>
+      </motion.div>
+    </motion.div>
   );
 };
 

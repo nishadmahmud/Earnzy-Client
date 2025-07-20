@@ -5,7 +5,7 @@ import { AuthContext } from '../auth/AuthProvider';
 const fetchUserData = async (email) => {
   if (!email) return null;
   
-  const response = await fetch(`http://localhost:5000/users?email=${encodeURIComponent(email)}`);
+  const response = await fetch(`${import.meta.env.VITE_SERVER_URL}/users?email=${encodeURIComponent(email)}`);
   if (!response.ok) {
     throw new Error('Failed to fetch user data');
   }

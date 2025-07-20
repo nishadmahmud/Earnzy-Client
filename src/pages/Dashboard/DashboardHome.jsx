@@ -1,31 +1,46 @@
-import React, { useContext, useEffect, useState } from 'react';
-import { AuthContext } from '../../auth/AuthProvider';
+import React from 'react';
+import { useUserData } from '../../hooks/useUserData';
 import BuyerHome from './Buyer/BuyerHome';
-import WorkerHome from '../Dashboard/Wroker/WorkerHome';
+import WorkerHome from './Wroker/WorkerHome';
 import AdminHome from './Admin/AdminHome';
+import useDocumentTitle from '../../hooks/useDocumentTitle';
 
 const DashboardHome = () => {
-  const { user } = useContext(AuthContext);
-  const [role, setRole] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const { data: userData } = useUserData();
+  
+  const role = userData?.role || 'worker';
 
-  useEffect(() => {
-    if (user?.email) {
-      fetch(`http://localhost:5000/users?email=${encodeURIComponent(user.email)}`)
-        .then(res => res.json())
-        .then(data => setRole(data.role || 'admin'))
-        .finally(() => setLoading(false));
+  // Set appropriate title based on role
+  const getTitle = () => {
+    switch (role) {
+      case 'buyer':
+        return 'Buyer Dashboard';
+      case 'worker':
+        return 'Worker Dashboard';
+      case 'admin':
+        return 'Admin Dashboard';
+      default:
+        return 'Dashboard';
     }
-  }, [user]);
+  };
 
-  if (loading) {
-    return <div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div></div>;
-  }
+  useDocumentTitle(getTitle());
 
-  if (role === 'buyer') return <BuyerHome />;
-  if (role === 'worker') return <WorkerHome />;
-  if (role === 'admin') return <AdminHome />;
-  return <div className="text-center text-slate-500 py-12">Unknown role.</div>;
+  // Render role-specific home component
+  const renderRoleHome = () => {
+    switch (role) {
+      case 'buyer':
+        return <BuyerHome />;
+      case 'worker':
+        return <WorkerHome />;
+      case 'admin':
+        return <AdminHome />;
+      default:
+        return <WorkerHome />;
+    }
+  };
+
+  return renderRoleHome();
 };
 
 export default DashboardHome; 

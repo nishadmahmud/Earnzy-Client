@@ -5,7 +5,7 @@ import { AuthContext } from '../auth/AuthProvider';
 const fetchWorkerDashboard = async (email) => {
   if (!email) return null;
   
-  const response = await fetch(`http://localhost:5000/worker/dashboard?email=${encodeURIComponent(email)}`);
+  const response = await fetch(`${import.meta.env.VITE_SERVER_URL}/worker/dashboard?email=${encodeURIComponent(email)}`);
   if (!response.ok) {
     throw new Error('Failed to fetch worker dashboard data');
   }

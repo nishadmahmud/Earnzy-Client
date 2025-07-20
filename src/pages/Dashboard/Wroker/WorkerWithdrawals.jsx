@@ -2,14 +2,21 @@ import React, { useState, useContext } from 'react';
 import { AuthContext } from '../../../auth/AuthProvider';
 import { useUserCoins, useRefreshUserCoins } from '../../../hooks/useUserData';
 import { useWorkerWithdrawals } from '../../../hooks/useTaskData';
-import { FiDollarSign, FiCreditCard, FiCheckCircle, FiClock, FiXCircle, FiAlertCircle } from 'react-icons/fi';
+import { FiDollarSign, FiCreditCard, FiCheckCircle, FiClock, FiXCircle, FiAlertCircle, FiTarget, FiSend, FiChevronLeft, FiChevronRight } from 'react-icons/fi';
+import { HiSparkles } from 'react-icons/hi2';
 import toast from 'react-hot-toast';
+import { motion } from 'framer-motion';
+import useDocumentTitle from '../../../hooks/useDocumentTitle';
 
 const WorkerWithdrawals = () => {
   const { user } = useContext(AuthContext);
   const { coins: userCoins = 0 } = useUserCoins();
   const refreshUserCoins = useRefreshUserCoins();
   const { data: withdrawals = [], refetch: refetchWithdrawals } = useWorkerWithdrawals(user?.email);
+  const [currentPage, setCurrentPage] = useState(1);
+  const withdrawalsPerPage = 5;
+
+  useDocumentTitle('Withdrawals');
 
   const [formData, setFormData] = useState({
     coinToWithdraw: '',
@@ -23,6 +30,16 @@ const WorkerWithdrawals = () => {
 
   const withdrawalAmount = formData.coinToWithdraw ? (formData.coinToWithdraw / COIN_TO_DOLLAR_RATE).toFixed(2) : '0.00';
   const totalWithdrawalAmount = (userCoins / COIN_TO_DOLLAR_RATE).toFixed(2);
+
+  // Pagination logic
+  const totalPages = Math.ceil(withdrawals.length / withdrawalsPerPage);
+  const startIndex = (currentPage - 1) * withdrawalsPerPage;
+  const endIndex = startIndex + withdrawalsPerPage;
+  const currentWithdrawals = withdrawals.slice(startIndex, endIndex);
+
+  const handlePageChange = (pageNumber) => {
+    setCurrentPage(pageNumber);
+  };
 
   const paymentSystems = [
     { value: 'bkash', label: 'Bkash' },
@@ -53,63 +70,40 @@ const WorkerWithdrawals = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-
-    
-    if (!formData.coinToWithdraw || !formData.paymentSystem || !formData.accountNumber) {
-      toast.error('Please fill in all fields');
-      return;
-    }
-
-    if (!user || !user.email) {
-      toast.error('User information is missing. Please try logging in again.');
-      return;
-    }
-
     const coinAmount = parseInt(formData.coinToWithdraw);
     
-    if (isNaN(coinAmount) || coinAmount <= 0) {
-      toast.error('Please enter a valid number of coins');
+    if (!coinAmount || coinAmount < MIN_WITHDRAWAL_COINS) {
+      toast.error(`Minimum withdrawal is ${MIN_WITHDRAWAL_COINS} coins ($${(MIN_WITHDRAWAL_COINS / COIN_TO_DOLLAR_RATE).toFixed(2)})`);
       return;
     }
     
-    if (coinAmount < MIN_WITHDRAWAL_COINS) {
-      toast.error(`Minimum withdrawal is ${MIN_WITHDRAWAL_COINS} coins ($${MIN_WITHDRAWAL_COINS / COIN_TO_DOLLAR_RATE})`);
-      return;
-    }
-
     if (coinAmount > userCoins) {
       toast.error('Insufficient coins');
+      return;
+    }
+    
+    if (!formData.paymentSystem || !formData.accountNumber.trim()) {
+      toast.error('Please fill all required fields');
       return;
     }
 
     try {
       setSubmitting(true);
-      
-      const requestBody = {
-        workerEmail: user.email,
-        workerName: user.displayName || user.name || user.email.split('@')[0],
-        withdrawalCoin: coinAmount,
-        withdrawalAmount: parseFloat(withdrawalAmount),
-        paymentSystem: formData.paymentSystem,
-        accountNumber: formData.accountNumber
-      };
-      
-      const response = await fetch(`${import.meta.env.VITE_SERVER_URL}/worker/withdraw`, {
+      const response = await fetch(`${import.meta.env.VITE_SERVER_URL}/withdraw`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(requestBody),
+        body: JSON.stringify({
+          workerEmail: user.email,
+          coinAmount: coinAmount,
+          dollarAmount: parseFloat(withdrawalAmount),
+          paymentSystem: formData.paymentSystem,
+          accountNumber: formData.accountNumber.trim()
+        }),
       });
 
-      let data;
-      try {
-        data = await response.json();
-      } catch (jsonError) {
-        console.error('Failed to parse JSON response:', jsonError);
-        toast.error('Invalid response from server');
-        return;
-      }
+      const data = await response.json();
 
       if (response.ok) {
         toast.success('Withdrawal request submitted successfully!');
@@ -118,11 +112,10 @@ const WorkerWithdrawals = () => {
           paymentSystem: '',
           accountNumber: ''
         });
-        // Refresh user coins and withdrawals
-        refreshUserCoins();
-        refetchWithdrawals();
+        await refreshUserCoins();
+        await refetchWithdrawals();
       } else {
-        toast.error(data.error || `Server error: ${response.status}`);
+        toast.error(data.error || 'Failed to submit withdrawal request');
       }
     } catch (error) {
       console.error('Withdrawal error:', error);
@@ -136,269 +129,543 @@ const WorkerWithdrawals = () => {
     switch (status) {
       case 'approved':
         return {
-          color: 'bg-green-100 text-green-700 border-green-200',
-          icon: <FiCheckCircle className="h-3 w-3" />,
+          color: 'bg-gradient-to-r from-emerald-100 to-green-100 text-emerald-700 border-emerald-200/50',
+          icon: <FiCheckCircle className="h-2 w-2" />,
           label: 'Approved'
         };
       case 'pending':
         return {
-          color: 'bg-yellow-100 text-yellow-700 border-yellow-200',
-          icon: <FiClock className="h-3 w-3" />,
+          color: 'bg-gradient-to-r from-amber-100 to-yellow-100 text-amber-700 border-amber-200/50',
+          icon: <FiClock className="h-2 w-2" />,
           label: 'Pending'
         };
       case 'rejected':
         return {
-          color: 'bg-red-100 text-red-700 border-red-200',
-          icon: <FiXCircle className="h-3 w-3" />,
+          color: 'bg-gradient-to-r from-red-100 to-pink-100 text-red-700 border-red-200/50',
+          icon: <FiXCircle className="h-2 w-2" />,
           label: 'Rejected'
         };
       default:
         return {
-          color: 'bg-slate-100 text-slate-700 border-slate-200',
-          icon: <FiClock className="h-3 w-3" />,
+          color: 'bg-gradient-to-r from-slate-100 to-gray-100 text-slate-700 border-slate-200/50',
+          icon: <FiClock className="h-2 w-2" />,
           label: 'Unknown'
         };
     }
   };
 
   const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
-    });
+    if (!dateString) return 'N/A';
+    try {
+      return new Date(dateString).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      });
+    } catch {
+      return 'Invalid Date';
+    }
   };
 
+  const fadeInUp = {
+    initial: { opacity: 0, y: 15 },
+    animate: { opacity: 1, y: 0 },
+    transition: { duration: 0.4, ease: "easeOut" }
+  };
+
+  const staggerContainer = {
+    initial: {},
+    animate: {
+      transition: {
+        staggerChildren: 0.05
+      }
+    }
+  };
+
+  const pendingWithdrawals = withdrawals.filter(w => w.status === 'pending');
+  const approvedWithdrawals = withdrawals.filter(w => w.status === 'approved');
+  const totalWithdrawn = approvedWithdrawals.reduce((sum, w) => sum + (w.dollarAmount || w.withdrawalAmount || 0), 0);
+
+  const statsCards = [
+    {
+      title: 'Available Coins',
+      value: userCoins,
+      subValue: `$${totalWithdrawalAmount}`,
+      icon: <FiDollarSign className="h-4 w-4" />,
+      bgColor: 'bg-blue-50',
+      textColor: 'text-blue-600'
+    },
+    {
+      title: 'Pending Requests',
+      value: pendingWithdrawals.length,
+      subValue: `$${pendingWithdrawals.reduce((sum, w) => sum + (w.dollarAmount || w.withdrawalAmount || 0), 0).toFixed(2)}`,
+      icon: <FiClock className="h-4 w-4" />,
+      bgColor: 'bg-amber-50',
+      textColor: 'text-amber-600'
+    },
+    {
+      title: 'Total Withdrawn',
+      value: approvedWithdrawals.length,
+      subValue: `$${totalWithdrawn.toFixed(2)}`,
+      icon: <FiCheckCircle className="h-4 w-4" />,
+      bgColor: 'bg-emerald-50',
+      textColor: 'text-emerald-600'
+    }
+  ];
+
   return (
-    <div className="space-y-6">
-      {/* User Earnings Overview */}
-      <div className="bg-white rounded-lg shadow-sm border border-slate-100 p-6">
-        <h1 className="text-2xl font-bold text-slate-800 mb-4">Withdrawals</h1>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-          <div className="bg-blue-50 p-6 rounded-lg">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-blue-600 font-medium">Current Balance</p>
-                <p className="text-3xl font-bold text-blue-700">{userCoins} coins</p>
-                <p className="text-sm text-blue-600 mt-1">≈ ${totalWithdrawalAmount}</p>
-              </div>
-              <FiDollarSign className="h-12 w-12 text-blue-500" />
-            </div>
-          </div>
-
-          <div className="bg-green-50 p-6 rounded-lg">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-green-600 font-medium">Withdrawal Rate</p>
-                <p className="text-3xl font-bold text-green-700">20:1</p>
-                <p className="text-sm text-green-600 mt-1">20 coins = $1</p>
-              </div>
-              <FiCreditCard className="h-12 w-12 text-green-500" />
-            </div>
+    <motion.div
+      initial="initial"
+      animate="animate"
+      variants={staggerContainer}
+      className="space-y-4"
+    >
+      {/* Header with Stats */}
+      <motion.div
+        variants={fadeInUp}
+        className="bg-white/60 backdrop-blur-xl rounded-2xl border border-white/50 p-4 shadow-lg"
+      >
+        <div className="flex items-center space-x-3 mb-3">
+          <motion.div
+            whileHover={{ scale: 1.05 }}
+            className="w-8 h-8 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl flex items-center justify-center shadow-sm"
+          >
+            <FiDollarSign className="h-4 w-4 text-white" />
+          </motion.div>
+          <div>
+            <h1 className="text-xl font-bold text-slate-800">Withdrawals</h1>
+            <p className="text-sm text-slate-600">Request withdrawals and track your earnings</p>
           </div>
         </div>
-
-        {/* Minimum Withdrawal Notice */}
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
-          <div className="flex items-center">
-            <FiAlertCircle className="h-5 w-5 text-yellow-600 mr-2" />
-            <p className="text-sm text-yellow-700">
-              Minimum withdrawal: 200 coins ($10). You currently have {userCoins} coins.
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Withdrawal Form */}
-      <div className="bg-white rounded-lg shadow-sm border border-slate-100 p-6">
-        <h2 className="text-xl font-semibold text-slate-800 mb-4">Request Withdrawal</h2>
         
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Stats Grid */}
+        <motion.div
+          variants={staggerContainer}
+          className="grid grid-cols-1 md:grid-cols-3 gap-3"
+        >
+          {statsCards.map((stat) => (
+            <motion.div
+              key={stat.title}
+              variants={fadeInUp}
+              whileHover={{ scale: 1.01, y: -1 }}
+              className="group bg-white/40 backdrop-blur-sm rounded-xl p-3 border border-white/50 shadow-sm hover:shadow-md transition-all duration-300"
+            >
+              <div className="flex items-center justify-between">
+                <div className="space-y-1">
+                  <p className="text-xs font-semibold text-slate-600 group-hover:text-slate-700 transition-colors">
+                    {stat.title}
+                  </p>
+                  <p className="text-lg font-bold text-slate-800 group-hover:text-slate-900 transition-colors">
+                    {stat.value}
+                  </p>
+                  <p className="text-xs font-medium text-slate-500">
+                    {stat.subValue}
+                  </p>
+                </div>
+                <motion.div
+                  whileHover={{ scale: 1.05 }}
+                  className={`p-2 ${stat.bgColor} rounded-lg shadow-sm group-hover:shadow-md transition-all duration-300`}
+                >
+                  <div className={stat.textColor}>
+                    {stat.icon}
+                  </div>
+                </motion.div>
+              </div>
+            </motion.div>
+          ))}
+        </motion.div>
+      </motion.div>
+
+      {/* Withdrawal Request Form */}
+      <motion.div
+        variants={fadeInUp}
+        className="bg-white/60 backdrop-blur-xl rounded-2xl border border-white/50 p-4 shadow-lg"
+      >
+        <div className="flex items-center space-x-2 mb-3">
+          <motion.div
+            whileHover={{ scale: 1.05 }}
+            className="w-6 h-6 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center shadow-sm"
+          >
+            <FiSend className="h-3 w-3 text-white" />
+          </motion.div>
+          <h2 className="text-lg font-semibold text-slate-800">New Withdrawal Request</h2>
+        </div>
+
+        {userCoins < MIN_WITHDRAWAL_COINS && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-3 p-3 bg-amber-50/80 border border-amber-200/50 rounded-xl"
+          >
+            <div className="flex items-center space-x-2">
+              <FiAlertCircle className="h-4 w-4 text-amber-600" />
+              <p className="text-sm text-amber-700">
+                Minimum withdrawal is {MIN_WITHDRAWAL_COINS} coins (${(MIN_WITHDRAWAL_COINS / COIN_TO_DOLLAR_RATE).toFixed(2)}). 
+                You need {MIN_WITHDRAWAL_COINS - userCoins} more coins.
+              </p>
+            </div>
+          </motion.div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
-              <label htmlFor="coinToWithdraw" className="block text-sm font-medium text-slate-700 mb-2">
+              <label className="block text-sm font-semibold text-slate-700 mb-2">
                 Coins to Withdraw *
               </label>
               <input
                 type="number"
-                id="coinToWithdraw"
                 name="coinToWithdraw"
                 value={formData.coinToWithdraw}
                 onChange={handleInputChange}
                 min={MIN_WITHDRAWAL_COINS}
                 max={userCoins}
-                className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="Enter coins to withdraw"
+                placeholder={`Min ${MIN_WITHDRAWAL_COINS} coins`}
+                className="w-full px-3 py-2 bg-white/60 backdrop-blur-sm border border-white/50 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 text-sm transition-all duration-200"
+                required
                 disabled={submitting}
               />
               <p className="text-xs text-slate-500 mt-1">
-                Min: {MIN_WITHDRAWAL_COINS} coins, Max: {userCoins} coins
+                Available: {userCoins} coins | Amount: ${withdrawalAmount}
               </p>
             </div>
 
             <div>
-              <label htmlFor="withdrawAmount" className="block text-sm font-medium text-slate-700 mb-2">
-                Withdrawal Amount ($)
+              <label className="block text-sm font-semibold text-slate-700 mb-2">
+                Payment Method *
               </label>
-              <input
-                type="text"
-                id="withdrawAmount"
-                value={`$${withdrawalAmount}`}
-                readOnly
-                className="w-full px-4 py-3 border border-slate-300 rounded-lg bg-slate-50 text-slate-600"
-              />
-              <p className="text-xs text-slate-500 mt-1">
-                Automatically calculated (20 coins = $1)
-              </p>
+              <select
+                name="paymentSystem"
+                value={formData.paymentSystem}
+                onChange={handleInputChange}
+                className="w-full px-3 py-2 bg-white/60 backdrop-blur-sm border border-white/50 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 text-sm transition-all duration-200"
+                required
+                disabled={submitting}
+              >
+                <option value="">Select payment method</option>
+                {paymentSystems.map(system => (
+                  <option key={system.value} value={system.value}>
+                    {system.label}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
 
           <div>
-            <label htmlFor="paymentSystem" className="block text-sm font-medium text-slate-700 mb-2">
-              Payment System *
-            </label>
-            <select
-              id="paymentSystem"
-              name="paymentSystem"
-              value={formData.paymentSystem}
-              onChange={handleInputChange}
-              className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              disabled={submitting}
-            >
-              <option value="">Select payment system</option>
-              {paymentSystems.map(system => (
-                <option key={system.value} value={system.value}>
-                  {system.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label htmlFor="accountNumber" className="block text-sm font-medium text-slate-700 mb-2">
+            <label className="block text-sm font-semibold text-slate-700 mb-2">
               Account Number *
             </label>
             <input
               type="text"
-              id="accountNumber"
               name="accountNumber"
               value={formData.accountNumber}
               onChange={handleInputChange}
-              className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               placeholder="Enter your account number"
+              className="w-full px-3 py-2 bg-white/60 backdrop-blur-sm border border-white/50 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 text-sm transition-all duration-200"
+              required
               disabled={submitting}
             />
           </div>
 
-          <div className="pt-4">
-            {formData.coinToWithdraw && formData.paymentSystem && formData.accountNumber ? (
-              // All fields are filled, check if withdrawal is valid
-              userCoins < MIN_WITHDRAWAL_COINS ? (
-                <div className="w-full px-6 py-3 bg-red-100 text-red-700 text-center rounded-lg border border-red-200">
-                  Insufficient coins. You need at least {MIN_WITHDRAWAL_COINS} coins to withdraw.
-                </div>
-              ) : parseInt(formData.coinToWithdraw) < MIN_WITHDRAWAL_COINS ? (
-                <div className="w-full px-6 py-3 bg-red-100 text-red-700 text-center rounded-lg border border-red-200">
-                  Minimum withdrawal is {MIN_WITHDRAWAL_COINS} coins (${MIN_WITHDRAWAL_COINS / COIN_TO_DOLLAR_RATE}). You entered {formData.coinToWithdraw} coins.
-                </div>
+          <div className="flex items-center justify-between pt-3">
+            <div className="flex items-center space-x-2">
+              <HiSparkles className="h-4 w-4 text-emerald-600" />
+              <div className="text-sm">
+                <span className="text-slate-600">Withdrawal Amount:</span>
+                <span className="ml-2 text-emerald-600 font-bold">${withdrawalAmount}</span>
+              </div>
+            </div>
+            
+            <motion.button
+              type="submit"
+              disabled={submitting || userCoins < MIN_WITHDRAWAL_COINS || !formData.coinToWithdraw || !formData.paymentSystem || !formData.accountNumber.trim()}
+              whileHover={{ scale: submitting ? 1 : 1.02 }}
+              whileTap={{ scale: submitting ? 1 : 0.98 }}
+              className="flex items-center px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white font-semibold text-sm rounded-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-md hover:shadow-lg"
+            >
+              {submitting ? (
+                <>
+                  <motion.div
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                    className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full mr-2"
+                  />
+                  Submitting...
+                </>
               ) : (
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="w-full flex items-center justify-center px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {submitting ? (
-                    <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                      Processing...
-                    </>
-                  ) : (
-                    <>
-                      <FiDollarSign className="h-4 w-4 mr-2" />
-                      Withdraw ${withdrawalAmount}
-                    </>
-                  )}
-                </button>
-              )
-            ) : (
-              <div className="w-full px-6 py-3 bg-red-100 text-red-700 text-center rounded-lg border border-red-200">
-                Please fill in all fields to proceed
+                <>
+                  <FiSend className="h-3 w-3 mr-2" />
+                  Request Withdrawal
+                </>
+              )}
+            </motion.button>
+          </div>
+        </form>
+      </motion.div>
+
+      {/* Withdrawals History */}
+      <motion.div
+        variants={fadeInUp}
+        className="bg-white/60 backdrop-blur-xl rounded-2xl border border-white/50 shadow-lg overflow-hidden"
+      >
+        <div className="px-4 py-3 border-b border-white/20 bg-gradient-to-r from-white/20 to-white/10">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <motion.div
+                whileHover={{ scale: 1.05 }}
+                className="w-6 h-6 bg-gradient-to-br from-violet-500 to-purple-600 rounded-lg flex items-center justify-center shadow-sm"
+              >
+                <FiCreditCard className="h-3 w-3 text-white" />
+              </motion.div>
+              <h3 className="text-lg font-semibold text-slate-800">Withdrawal History</h3>
+            </div>
+            {withdrawals.length > 0 && (
+              <div className="text-sm text-slate-600">
+                Showing {startIndex + 1}-{Math.min(endIndex, withdrawals.length)} of {withdrawals.length}
               </div>
             )}
           </div>
-        </form>
-      </div>
-
-      {/* Withdrawal History */}
-      <div className="bg-white rounded-lg shadow-sm border border-slate-100 overflow-hidden">
-        <div className="p-6 border-b border-slate-200">
-          <h2 className="text-xl font-semibold text-slate-800">Withdrawal History</h2>
         </div>
-        
+
         {withdrawals.length === 0 ? (
-          <div className="p-12 text-center">
-            <FiDollarSign className="h-16 w-16 text-slate-300 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-slate-600 mb-2">No Withdrawals Yet</h3>
-            <p className="text-slate-500">Your withdrawal requests will appear here.</p>
-          </div>
+          <motion.div
+            variants={fadeInUp}
+            className="p-8 text-center"
+          >
+            <motion.div
+              whileHover={{ scale: 1.05 }}
+              className="w-12 h-12 bg-slate-100 rounded-xl flex items-center justify-center mx-auto mb-3"
+            >
+              <FiCreditCard className="h-6 w-6 text-slate-400" />
+            </motion.div>
+            <h3 className="text-base font-semibold text-slate-600 mb-1">No Withdrawals Yet</h3>
+            <p className="text-sm text-slate-500">Your withdrawal requests will appear here.</p>
+          </motion.div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-slate-50 border-b border-slate-200">
-                <tr>
-                  <th className="px-6 py-4 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
-                    Date
-                  </th>
-                  <th className="px-6 py-4 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
-                    Amount
-                  </th>
-                  <th className="px-6 py-4 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
-                    Payment System
-                  </th>
-                  <th className="px-6 py-4 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
-                    Account
-                  </th>
-                  <th className="px-6 py-4 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
-                    Status
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-slate-200">
-                {withdrawals.map((withdrawal) => {
-                  const statusConfig = getStatusConfig(withdrawal.status);
-                  return (
-                    <tr key={withdrawal._id} className="hover:bg-slate-50 transition-colors">
-                      <td className="px-6 py-4 text-sm text-slate-900">
-                        {formatDate(withdrawal.withdrawDate)}
-                      </td>
-                      <td className="px-6 py-4">
-                        <div>
-                          <p className="text-sm font-medium text-slate-900">{withdrawal.withdrawalCoin} coins</p>
-                          <p className="text-xs text-green-600">${withdrawal.withdrawalAmount}</p>
+          <>
+            {/* Mobile Cards View */}
+            <div className="md:hidden divide-y divide-white/20">
+              {currentWithdrawals.map((withdrawal, index) => {
+                const statusConfig = getStatusConfig(withdrawal.status);
+                return (
+                  <motion.div
+                    key={withdrawal._id}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: index * 0.05 }}
+                    className="p-4 hover:bg-white/20 transition-all duration-200"
+                  >
+                    <div className="space-y-3">
+                      {/* Amount and Status */}
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-center space-x-2">
+                          <FiDollarSign className="h-4 w-4 text-emerald-600" />
+                          <div>
+                            <p className="text-lg font-bold text-emerald-600">
+                              ${(withdrawal.dollarAmount || withdrawal.withdrawalAmount || 0).toFixed(2)}
+                            </p>
+                            <p className="text-xs text-slate-500">
+                              {withdrawal.coinAmount || withdrawal.withdrawalCoin || 0} coins
+                            </p>
+                          </div>
                         </div>
-                      </td>
-                      <td className="px-6 py-4 text-sm text-slate-900 capitalize">
-                        {withdrawal.paymentSystem}
-                      </td>
-                      <td className="px-6 py-4 text-sm text-slate-600">
-                        {withdrawal.accountNumber}
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border ${statusConfig.color}`}>
+                        <motion.span
+                          whileHover={{ scale: 1.02 }}
+                          className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold border shadow-sm ${statusConfig.color}`}
+                        >
                           {statusConfig.icon}
                           <span className="ml-1">{statusConfig.label}</span>
+                        </motion.span>
+                      </div>
+
+                      {/* Payment Details */}
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <div className="flex items-center space-x-1 mb-1">
+                            <FiCreditCard className="h-3 w-3 text-slate-400" />
+                            <span className="text-xs font-medium text-slate-600">Payment Method</span>
+                          </div>
+                          <p className="text-sm font-medium text-slate-900 capitalize">{withdrawal.paymentSystem}</p>
+                        </div>
+                        <div>
+                          <div className="flex items-center space-x-1 mb-1">
+                            <FiTarget className="h-3 w-3 text-slate-400" />
+                            <span className="text-xs font-medium text-slate-600">Account</span>
+                          </div>
+                          <p className="text-sm text-slate-900">{withdrawal.accountNumber}</p>
+                        </div>
+                      </div>
+
+                      {/* Date */}
+                      <div className="flex items-center space-x-1">
+                        <FiClock className="h-3 w-3 text-blue-600" />
+                        <span className="text-xs text-slate-600">
+                          Requested on {formatDate(withdrawal.requestedAt)}
                         </span>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                      </div>
+                    </div>
+                  </motion.div>
+                );
+              })}
+            </div>
+
+            {/* Desktop Table View */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gradient-to-r from-slate-50/80 to-blue-50/80 backdrop-blur-sm">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                      Amount
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                      Payment Method
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                      Account
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                      Date
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                      Status
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/20">
+                  {currentWithdrawals.map((withdrawal, index) => {
+                    const statusConfig = getStatusConfig(withdrawal.status);
+                    return (
+                      <motion.tr
+                        key={withdrawal._id}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: index * 0.05 }}
+                        className={`hover:bg-white/40 transition-all duration-200 ${
+                          index % 2 === 0 ? 'bg-white/20' : 'bg-white/10'
+                        }`}
+                      >
+                        <td className="px-4 py-3">
+                          <div className="flex items-center space-x-1">
+                            <FiDollarSign className="h-3 w-3 text-emerald-600" />
+                            <div>
+                              <p className="text-sm font-bold text-emerald-600">
+                                ${(withdrawal.dollarAmount || withdrawal.withdrawalAmount || 0).toFixed(2)}
+                              </p>
+                              <p className="text-xs text-slate-500">
+                                {withdrawal.coinAmount || withdrawal.withdrawalCoin || 0} coins
+                              </p>
+                            </div>
+                          </div>
+                        </td>
+                        
+                        <td className="px-4 py-3">
+                          <p className="text-sm font-medium text-slate-800 capitalize">
+                            {withdrawal.paymentSystem}
+                          </p>
+                        </td>
+                        
+                        <td className="px-4 py-3">
+                          <p className="text-sm text-slate-600">
+                            {withdrawal.accountNumber}
+                          </p>
+                        </td>
+                        
+                        <td className="px-4 py-3">
+                          <p className="text-xs text-slate-600">
+                            {formatDate(withdrawal.requestedAt)}
+                          </p>
+                        </td>
+                        
+                        <td className="px-4 py-3">
+                          <motion.span
+                            whileHover={{ scale: 1.02 }}
+                            className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold border shadow-sm ${statusConfig.color}`}
+                          >
+                            {statusConfig.icon}
+                            <span className="ml-1">{statusConfig.label}</span>
+                          </motion.span>
+                        </td>
+                      </motion.tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="px-4 py-3 border-t border-white/20 bg-gradient-to-r from-white/10 to-white/20">
+                <div className="flex items-center justify-between">
+                  <div className="text-sm text-slate-600">
+                    Page {currentPage} of {totalPages}
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <button
+                      onClick={() => handlePageChange(currentPage - 1)}
+                      disabled={currentPage === 1}
+                      className="p-2 rounded-lg bg-white/40 border border-white/50 text-slate-600 hover:bg-white/60 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+                    >
+                      <FiChevronLeft className="h-4 w-4" />
+                    </button>
+                    
+                    {/* Page Numbers */}
+                    <div className="flex items-center space-x-1">
+                      {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
+                        <button
+                          key={pageNum}
+                          onClick={() => handlePageChange(pageNum)}
+                          className={`px-3 py-1 rounded-lg text-sm font-medium transition-all duration-200 ${
+                            currentPage === pageNum
+                              ? 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-md'
+                              : 'bg-white/40 border border-white/50 text-slate-600 hover:bg-white/60'
+                          }`}
+                        >
+                          {pageNum}
+                        </button>
+                      ))}
+                    </div>
+                    
+                    <button
+                      onClick={() => handlePageChange(currentPage + 1)}
+                      disabled={currentPage === totalPages}
+                      className="p-2 rounded-lg bg-white/40 border border-white/50 text-slate-600 hover:bg-white/60 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+                    >
+                      <FiChevronRight className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </>
         )}
-      </div>
-    </div>
+      </motion.div>
+
+      {/* Summary Footer */}
+      {withdrawals.length > 0 && (
+        <motion.div
+          variants={fadeInUp}
+          className="bg-white/40 backdrop-blur-sm rounded-xl border border-white/50 p-3 shadow-sm"
+        >
+          <div className="flex items-center justify-between text-xs">
+            <div className="flex items-center space-x-1">
+              <FiTarget className="h-3 w-3 text-slate-600" />
+              <span className="text-slate-600">
+                Total Requests: <span className="font-bold text-slate-800">{withdrawals.length}</span>
+              </span>
+            </div>
+            <div className="flex items-center space-x-3">
+              <div className="flex items-center space-x-1">
+                <HiSparkles className="h-3 w-3 text-emerald-600" />
+                <span className="text-emerald-600 font-semibold">
+                  ${totalWithdrawn.toFixed(2)} withdrawn
+                </span>
+              </div>
+            </div>
+          </div>
+        </motion.div>
+      )}
+    </motion.div>
   );
 };
 

@@ -2,6 +2,7 @@ import React, { useState, useContext } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { FiEye, FiEyeOff } from 'react-icons/fi';
 import { AuthContext } from '../../auth/AuthProvider';
+import useDocumentTitle from '../../hooks/useDocumentTitle';
 
 const roles = [
   { value: '', label: 'Select role' },
@@ -19,13 +20,16 @@ function getPasswordStrength(password) {
   if (/[a-z]/.test(password)) score++;
   if (/[0-9]/.test(password)) score++;
   if (/[^A-Za-z0-9]/.test(password)) score++;
-  if (score <= 2) return { label: 'Weak', color: 'text-red-500' };
-  if (score === 3) return { label: 'Medium', color: 'text-yellow-500' };
+  
+  if (score < 2) return { label: 'Weak', color: 'text-red-600' };
+  if (score < 3) return { label: 'Fair', color: 'text-yellow-600' };
   if (score >= 4) return { label: 'Strong', color: 'text-green-600' };
   return { label: '', color: '' };
 }
 
 const Register = () => {
+  useDocumentTitle('Register');
+  
   const [form, setForm] = useState({
     name: '',
     email: '',
@@ -96,7 +100,7 @@ const Register = () => {
     formData.append('image', file);
     
     try {
-      const res = await fetch('http://localhost:5000/upload-image', {
+      const res = await fetch(`${import.meta.env.VITE_SERVER_URL}/upload-image`, {
         method: 'POST',
         body: formData,
       });
@@ -136,7 +140,7 @@ const Register = () => {
       await createUser(form.email, form.password);
       await updateUserProfile(form.name, form.profilePic);
       // Save user to MongoDB
-      await fetch('http://localhost:5000/users', {
+      await fetch(`${import.meta.env.VITE_SERVER_URL}/users`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

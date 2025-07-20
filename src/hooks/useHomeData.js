@@ -1,8 +1,16 @@
 import { useQuery } from '@tanstack/react-query';
 
 const fetchTopWorkers = async () => {
-  const response = await fetch(`${import.meta.env.VITE_SERVER_URL}/top-workers`);
+  const serverUrl = import.meta.env.VITE_SERVER_URL;
+  const fullUrl = `${serverUrl}/top-workers`;
+  
+  console.log('🔍 Debug - Server URL:', serverUrl);
+  console.log('🔍 Debug - Full URL:', fullUrl);
+  console.log('🔍 Debug - Environment variables:', import.meta.env);
+  
+  const response = await fetch(fullUrl);
   if (!response.ok) {
+    console.error('❌ Response not OK:', response.status, response.statusText);
     throw new Error('Failed to fetch top workers');
   }
   return response.json();

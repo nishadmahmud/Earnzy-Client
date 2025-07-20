@@ -3,8 +3,11 @@ import { Link, useNavigate } from 'react-router';
 import { FcGoogle } from 'react-icons/fc';
 import { FiEye, FiEyeOff } from 'react-icons/fi';
 import { AuthContext } from '../../auth/AuthProvider';
+import useDocumentTitle from '../../hooks/useDocumentTitle';
 
 const Login = () => {
+    useDocumentTitle('Login');
+    
     const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState('');
     const { googleSignIn } = useContext(AuthContext);
@@ -18,7 +21,7 @@ const Login = () => {
             const result = await googleSignIn();
             // Save user to MongoDB (only if new)
             const user = result.user;
-            await fetch('http://localhost:5000/users', {
+            await fetch(`${import.meta.env.VITE_SERVER_URL}/users`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({

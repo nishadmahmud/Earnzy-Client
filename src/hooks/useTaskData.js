@@ -1,36 +1,44 @@
 import { useQuery } from '@tanstack/react-query';
 
-const fetchAvailableTasks = async () => {
-  const response = await fetch(`${import.meta.env.VITE_SERVER_URL}/tasks/available`);
+const fetchAvailableTasks = async (workerEmail) => {
+  const url = workerEmail 
+    ? `${import.meta.env.VITE_SERVER_URL}/tasks/available?workerEmail=${encodeURIComponent(workerEmail)}`
+    : `${import.meta.env.VITE_SERVER_URL}/tasks/available`;
+    
+  const response = await fetch(url);
   if (!response.ok) {
     throw new Error('Failed to fetch available tasks');
   }
   return response.json();
 };
 
-const fetchTaskById = async (id) => {
+const fetchTaskById = async (id, workerEmail) => {
   if (!id) return null;
   
-  const response = await fetch(`${import.meta.env.VITE_SERVER_URL}/tasks/${id}`);
+  const url = workerEmail 
+    ? `${import.meta.env.VITE_SERVER_URL}/tasks/${id}?workerEmail=${encodeURIComponent(workerEmail)}`
+    : `${import.meta.env.VITE_SERVER_URL}/tasks/${id}`;
+    
+  const response = await fetch(url);
   if (!response.ok) {
     throw new Error('Failed to fetch task details');
   }
   return response.json();
 };
 
-export const useAvailableTasks = () => {
+export const useAvailableTasks = (workerEmail) => {
   return useQuery({
-    queryKey: ['availableTasks'],
-    queryFn: fetchAvailableTasks,
+    queryKey: ['availableTasks', workerEmail],
+    queryFn: () => fetchAvailableTasks(workerEmail),
     staleTime: 1000 * 60 * 2, // 2 minutes
     refetchInterval: 1000 * 60 * 5, // Refetch every 5 minutes
   });
 };
 
-export const useTaskDetails = (id) => {
+export const useTaskDetails = (id, workerEmail) => {
   return useQuery({
-    queryKey: ['taskDetails', id],
-    queryFn: () => fetchTaskById(id),
+    queryKey: ['taskDetails', id, workerEmail],
+    queryFn: () => fetchTaskById(id, workerEmail),
     enabled: !!id,
     staleTime: 1000 * 60 * 5, // 5 minutes
   });

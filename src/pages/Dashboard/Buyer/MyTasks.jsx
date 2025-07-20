@@ -1,11 +1,14 @@
 import React, { useEffect, useState, useContext } from 'react';
 import { AuthContext } from '../../../auth/AuthProvider';
-import { FiEdit, FiTrash2, FiX, FiSave } from 'react-icons/fi';
-import { useUserCoins, useRefreshUserCoins } from '../../../hooks/useUserData';
+import { FiEdit, FiTrash2, FiX, FiSave, FiClipboard, FiUsers, FiDollarSign, FiCalendar, FiEye, FiTarget, FiImage, FiUpload } from 'react-icons/fi';
+import { HiSparkles } from 'react-icons/hi2';
+import { useRefreshUserCoins } from '../../../hooks/useUserData';
+import { motion, AnimatePresence } from 'framer-motion';
+import toast from 'react-hot-toast';
+import useDocumentTitle from '../../../hooks/useDocumentTitle';
 
 const MyTasks = () => {
   const { user } = useContext(AuthContext);
-  const { coins } = useUserCoins();
   const refreshUserCoins = useRefreshUserCoins();
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -19,10 +22,12 @@ const MyTasks = () => {
     submissionInfo: '', 
     imageUrl: '' 
   });
-  const [success, setSuccess] = useState('');
-  const [error, setError] = useState('');
   const [updating, setUpdating] = useState(false);
   const [deleting, setDeleting] = useState(null);
+  const [imageUploading, setImageUploading] = useState(false);
+  const [imagePreview, setImagePreview] = useState(null);
+
+  useDocumentTitle('My Tasks');
 
   useEffect(() => {
     if (user?.email) {
@@ -33,147 +38,171 @@ const MyTasks = () => {
   const fetchTasks = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`http://localhost:5000/tasks?buyer=${encodeURIComponent(user.email)}`);
+      const response = await fetch(`${import.meta.env.VITE_SERVER_URL}/tasks?buyer=${encodeURIComponent(user.email)}`);
       
       if (response.ok) {
         const data = await response.json();
         setTasks(data);
       } else {
-        setError('Failed to fetch tasks');
+        toast.error('Failed to fetch tasks');
       }
     } catch (error) {
       console.error('Error fetching tasks:', error);
-      setError('Failed to fetch tasks');
+      toast.error('Failed to fetch tasks');
     } finally {
       setLoading(false);
     }
   };
 
   const handleEdit = (task) => {
-    setEditTask(task);
-    setEditForm({
+    setEditTask(task._id);
+    const formData = {
       title: task.title,
       detail: task.detail,
       requiredWorkers: task.requiredWorkers,
       payableAmount: task.payableAmount,
-      completionDate: task.completionDate,
+      completionDate: task.completionDate.split('T')[0],
       submissionInfo: task.submissionInfo,
-      imageUrl: task.imageUrl || '',
+      imageUrl: task.imageUrl || ''
+    };
+    setEditForm(formData);
+    
+    // Set image preview if task has an image
+    if (task.imageUrl) {
+      setImagePreview(task.imageUrl);
+    } else {
+      setImagePreview(null);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setEditTask(null);
+    setEditForm({ 
+      title: '', 
+      detail: '', 
+      requiredWorkers: '', 
+      payableAmount: '', 
+      completionDate: '', 
+      submissionInfo: '', 
+      imageUrl: '' 
     });
-    setError('');
-    setSuccess('');
+    setImagePreview(null);
   };
 
-  const closeModal = () => {
-    if (!updating) {
-      setEditTask(null);
-    }
-  };
-
-  // Handle escape key to close modal
-  React.useEffect(() => {
-    const handleEscape = (e) => {
-      if (e.key === 'Escape' && editTask) {
-        closeModal();
-      }
-    };
-
-    if (editTask) {
-      document.addEventListener('keydown', handleEscape);
-      // Prevent body scroll when modal is open
-      document.body.style.overflow = 'hidden';
+  const handleFileSelect = async (e) => {
+    const file = e.target.files[0];
+    console.log('🔍 File selected:', file);
+    if (!file) {
+      setImagePreview(null);
+      return;
     }
 
-    return () => {
-      document.removeEventListener('keydown', handleEscape);
-      document.body.style.overflow = 'unset';
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please select a valid image file');
+      return;
+    }
+
+    // Validate file size (5MB limit)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Image size should be less than 5MB');
+      return;
+    }
+
+    // Create preview
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      console.log('🖼️ Preview created, setting imagePreview');
+      setImagePreview(e.target.result);
     };
-  }, [editTask, updating]);
+    reader.readAsDataURL(file);
 
-  const handleEditChange = (e) => {
-    setEditForm({ ...editForm, [e.target.name]: e.target.value });
-  };
-
-  const handleEditSave = async () => {
+    // Upload to Cloudinary via server
+    console.log('☁️ Starting upload to Cloudinary...');
+    setImageUploading(true);
     try {
-      setUpdating(true);
-      setError('');
-      
-      // Validate form data
-      if (!editForm.title || !editForm.detail || !editForm.requiredWorkers || !editForm.payableAmount || !editForm.completionDate || !editForm.submissionInfo) {
-        setError('All fields are required');
-        setUpdating(false);
-        return;
-      }
+      const formData = new FormData();
+      formData.append('image', file);
 
-      if (Number(editForm.requiredWorkers) <= 0 || Number(editForm.payableAmount) <= 0) {
-        setError('Required workers and payable amount must be positive numbers');
-        setUpdating(false);
-        return;
-      }
-
-      console.log('Sending update request:', {
-        title: editForm.title,
-        detail: editForm.detail,
-        requiredWorkers: Number(editForm.requiredWorkers),
-        payableAmount: Number(editForm.payableAmount),
-        completionDate: editForm.completionDate,
-        submissionInfo: editForm.submissionInfo,
-        imageUrl: editForm.imageUrl,
-        buyerEmail: user.email
+      const response = await fetch(`${import.meta.env.VITE_SERVER_URL}/upload-image`, {
+        method: 'POST',
+        body: formData,
       });
+
+      const data = await response.json();
       
-      const response = await fetch(`http://localhost:5000/tasks/${editTask._id}`, {
+      if (data.success) {
+        console.log('✅ Upload successful, URL:', data.imageUrl);
+        console.log('📝 Current editForm before update:', editForm);
+        setEditForm({ ...editForm, imageUrl: data.imageUrl });
+        console.log('📝 EditForm updated with imageUrl');
+        toast.success('Image uploaded successfully!');
+      } else {
+        throw new Error('Upload failed');
+      }
+    } catch (error) {
+      console.error('❌ Image upload error:', error);
+      toast.error('Failed to upload image. Please try again.');
+      setImagePreview(null);
+    } finally {
+      console.log('🏁 Upload finished, setting imageUploading to false');
+      setImageUploading(false);
+    }
+  };
+
+  const removeImage = () => {
+    setEditForm({ ...editForm, imageUrl: '' });
+    setImagePreview(null);
+  };
+
+  const handleUpdateTask = async (e) => {
+    e.preventDefault();
+    
+    if (!editForm.title.trim() || !editForm.detail.trim() || !editForm.submissionInfo.trim()) {
+      toast.error('Please fill in all required fields');
+      return;
+    }
+
+    setUpdating(true);
+    try {
+      const response = await fetch(`${import.meta.env.VITE_SERVER_URL}/tasks/${editTask}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          title: editForm.title,
-          detail: editForm.detail,
-          requiredWorkers: Number(editForm.requiredWorkers),
-          payableAmount: Number(editForm.payableAmount),
-          completionDate: editForm.completionDate,
-          submissionInfo: editForm.submissionInfo,
-          imageUrl: editForm.imageUrl,
-          buyerEmail: user.email
+          ...editForm,
+          buyerEmail: user.email,
+          requiredWorkers: parseInt(editForm.requiredWorkers),
+          payableAmount: parseInt(editForm.payableAmount),
+          totalPayable: parseInt(editForm.requiredWorkers) * parseInt(editForm.payableAmount),
         }),
       });
 
       if (response.ok) {
-        const data = await response.json();
-        if (data.coinDifference > 0) {
-          setSuccess(`Task updated successfully! Additional ${data.coinDifference} coins deducted.`);
-        } else if (data.coinDifference < 0) {
-          setSuccess(`Task updated successfully! ${Math.abs(data.coinDifference)} coins refunded.`);
-        } else {
-          setSuccess('Task updated successfully!');
-        }
-        refreshUserCoins();
-        setEditTask(null);
-        fetchTasks();
+        toast.success('Task updated successfully!');
+        await fetchTasks();
+        handleCancelEdit();
       } else {
-        const data = await response.json();
-        setError(data.error || 'Failed to update task');
+        const errorData = await response.json();
+        toast.error(errorData.error || 'Failed to update task');
       }
     } catch (error) {
       console.error('Error updating task:', error);
-      setError('Failed to update task');
+      toast.error('Error updating task');
     } finally {
       setUpdating(false);
     }
   };
 
-  const handleDelete = async (task) => {
-    if (!window.confirm('Are you sure you want to delete this task? This action cannot be undone.')) {
+  const handleDeleteTask = async (taskId) => {
+    if (!window.confirm('Are you sure you want to delete this task?')) {
       return;
     }
 
+    setDeleting(taskId);
     try {
-      setDeleting(task._id);
-      setError('');
-      
-      const response = await fetch(`http://localhost:5000/tasks/${task._id}`, {
+      const response = await fetch(`${import.meta.env.VITE_SERVER_URL}/tasks/${taskId}`, {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
@@ -184,323 +213,438 @@ const MyTasks = () => {
       });
 
       if (response.ok) {
-        const data = await response.json();
-        setSuccess(`Task deleted successfully! ${data.refundAmount > 0 ? `Refunded ${data.refundAmount} coins.` : ''}`);
-        refreshUserCoins();
-        fetchTasks();
+        toast.success('Task deleted successfully!');
+        await fetchTasks();
+        await refreshUserCoins();
       } else {
-        const data = await response.json();
-        setError(data.error || 'Failed to delete task');
+        const errorData = await response.json();
+        toast.error(errorData.error || 'Failed to delete task');
       }
     } catch (error) {
       console.error('Error deleting task:', error);
-      setError('Failed to delete task');
+      toast.error('Error deleting task');
     } finally {
       setDeleting(null);
     }
   };
 
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'active':
+        return 'bg-gradient-to-r from-emerald-100 to-green-100 text-emerald-700 border-emerald-200/50';
+      case 'completed':
+        return 'bg-gradient-to-r from-blue-100 to-indigo-100 text-blue-700 border-blue-200/50';
+      case 'paused':
+        return 'bg-gradient-to-r from-amber-100 to-yellow-100 text-amber-700 border-amber-200/50';
+      default:
+        return 'bg-gradient-to-r from-slate-100 to-gray-100 text-slate-700 border-slate-200/50';
+    }
+  };
+
+  const formatDate = (dateString) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
+  };
+
+  const fadeInUp = {
+    initial: { opacity: 0, y: 15 },
+    animate: { opacity: 1, y: 0 },
+    transition: { duration: 0.4, ease: "easeOut" }
+  };
+
+  const staggerContainer = {
+    initial: {},
+    animate: {
+      transition: {
+        staggerChildren: 0.05
+      }
+    }
+  };
+
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      <div className="flex items-center justify-center h-32">
+        <motion.div
+          animate={{ rotate: 360 }}
+          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+          className="w-8 h-8 border-3 border-blue-500/30 border-t-blue-500 rounded-full"
+        />
       </div>
     );
   }
 
+  const activeTasks = tasks.filter(task => task.status === 'active');
+  const totalSpent = tasks.reduce((sum, task) => sum + (task.totalPayable || 0), 0);
+
+  const statsCards = [
+    {
+      title: 'Total Tasks',
+      value: tasks.length,
+      icon: <FiClipboard className="h-4 w-4" />,
+      bgColor: 'bg-blue-50',
+      textColor: 'text-blue-600'
+    },
+    {
+      title: 'Active Tasks',
+      value: activeTasks.length,
+      icon: <FiTarget className="h-4 w-4" />,
+      bgColor: 'bg-emerald-50',
+      textColor: 'text-emerald-600'
+    },
+    {
+      title: 'Total Spent',
+      value: `${totalSpent} coins`,
+      icon: <FiDollarSign className="h-4 w-4" />,
+      bgColor: 'bg-violet-50',
+      textColor: 'text-violet-600'
+    }
+  ];
+
   return (
-    <div className="max-w-6xl mx-auto bg-white p-6 rounded-xl shadow-md border border-slate-100 mt-4">
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold text-slate-800">My Tasks</h2>
-        <div className="text-sm text-slate-600">
-          <span className="font-medium">Available Coins: </span>
-          <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full font-semibold">
-            {coins}
-          </span>
-        </div>
-      </div>
-
-      {error && (
-        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md">
-          <div className="text-red-600 text-sm">{error}</div>
-        </div>
-      )}
-
-      {success && (
-        <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-md">
-          <div className="text-green-600 text-sm">{success}</div>
-        </div>
-      )}
-
-      {tasks.length === 0 ? (
-        <div className="text-center text-slate-500 py-12">
-          <div className="text-lg font-medium mb-2">No tasks found</div>
-          <p className="text-sm">You haven't created any tasks yet. Start by adding a new task!</p>
-        </div>
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-slate-50">
-              <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Title</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Detail</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Required Workers</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Payable Amount</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Completion Date</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Submission Info</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Image</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-slate-100">
-              {tasks
-                .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-                .map(task => (
-                  <tr key={task._id} className="hover:bg-slate-50">
-                    <td className="px-4 py-4">
-                      <div className="text-sm font-medium text-slate-900">{task.title}</div>
-                      <div className="text-xs text-slate-500">Status: {task.status}</div>
-                    </td>
-                    <td className="px-4 py-4">
-                      <div className="text-sm text-slate-700 max-w-xs truncate" title={task.detail}>
-                        {task.detail}
-                      </div>
-                    </td>
-                    <td className="px-4 py-4 text-sm text-slate-700">{task.requiredWorkers}</td>
-                    <td className="px-4 py-4">
-                      <div className="text-sm font-medium text-green-600">{task.payableAmount} coins</div>
-                      <div className="text-xs text-slate-500">Total: {task.totalPayable} coins</div>
-                    </td>
-                    <td className="px-4 py-4 text-sm text-slate-700">{task.completionDate}</td>
-                    <td className="px-4 py-4">
-                      <div className="text-sm text-slate-700 max-w-xs truncate" title={task.submissionInfo}>
-                        {task.submissionInfo}
-                      </div>
-                    </td>
-                    <td className="px-4 py-4">
-                      {task.imageUrl ? (
-                        <img 
-                          src={task.imageUrl} 
-                          alt="Task" 
-                          className="h-12 w-12 object-cover rounded-md border border-slate-200" 
-                        />
-                      ) : (
-                        <div className="h-12 w-12 bg-slate-100 rounded-md flex items-center justify-center">
-                          <span className="text-xs text-slate-400">No image</span>
-                        </div>
-                      )}
-                    </td>
-                    <td className="px-4 py-4">
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => handleEdit(task)}
-                          className="p-2 rounded-md bg-blue-50 hover:bg-blue-100 text-blue-700 transition-colors"
-                          title="Edit task"
-                        >
-                          <FiEdit className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(task)}
-                          disabled={deleting === task._id}
-                          className="p-2 rounded-md bg-red-50 hover:bg-red-100 text-red-700 transition-colors disabled:opacity-50"
-                          title="Delete task"
-                        >
-                          {deleting === task._id ? (
-                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-600"></div>
-                          ) : (
-                            <FiTrash2 className="h-4 w-4" />
-                          )}
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {/* Edit Modal */}
-      {editTask && (
-        <div 
-          className="fixed inset-0 backdrop-blur-sm flex items-center justify-center z-50"
-          style={{ 
-            backgroundColor: 'rgba(255, 255, 255, 0.1)',
-            backdropFilter: 'blur(4px) brightness(0.8)'
-          }}
-          onClick={(e) => {
-            if (e.target === e.currentTarget) {
-              closeModal();
-            }
-          }}
-          onWheel={(e) => {
-            // Allow scrolling the modal content when scrolling outside
-            const modalContent = e.currentTarget.querySelector('.modal-content');
-            if (modalContent && !modalContent.contains(e.target)) {
-              e.preventDefault();
-              modalContent.scrollTop += e.deltaY;
-            }
-          }}
-        >
-          {/* Close button positioned outside modal */}
-          <button 
-            onClick={closeModal} 
-            className="absolute top-4 right-4 z-10 bg-white rounded-full p-2 shadow-lg hover:shadow-xl text-slate-400 hover:text-slate-600 transition-all duration-200 hover:scale-110"
-            disabled={updating}
-            title="Close modal"
+    <motion.div
+      initial="initial"
+      animate="animate"
+      variants={staggerContainer}
+      className="space-y-4"
+    >
+      {/* Stats Section */}
+      <motion.div
+        variants={staggerContainer}
+        className="grid grid-cols-1 md:grid-cols-3 gap-3"
+      >
+        {statsCards.map((stat) => (
+          <motion.div
+            key={stat.title}
+            variants={fadeInUp}
+            whileHover={{ scale: 1.01, y: -1 }}
+            className="group bg-white/60 backdrop-blur-xl rounded-2xl border border-white/50 p-4 shadow-lg hover:shadow-xl transition-all duration-300"
           >
-            <FiX className="h-6 w-6" />
-          </button>
-          
-          <div 
-            className="modal-content bg-white rounded-lg max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="px-6 py-4 border-b border-slate-100">
-              <h3 className="text-lg font-semibold text-slate-800">Update Task</h3>
-            </div>
-            
-            <div className="px-6 py-4 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Title</label>
-                <input
-                  type="text"
-                  name="title"
-                  value={editForm.title}
-                  onChange={handleEditChange}
-                  className="w-full px-4 py-2 border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-800 bg-slate-50"
-                  disabled={updating}
-                />
+            <div className="flex items-center justify-between">
+              <div className="space-y-1">
+                <p className="text-xs font-semibold text-slate-600 group-hover:text-slate-700 transition-colors">
+                  {stat.title}
+                </p>
+                <p className="text-lg font-bold text-slate-800 group-hover:text-slate-900 transition-colors">
+                  {stat.value}
+                </p>
               </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Task Detail</label>
-                <textarea
-                  name="detail"
-                  value={editForm.detail}
-                  onChange={handleEditChange}
-                  rows={3}
-                  className="w-full px-4 py-2 border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-800 bg-slate-50"
-                  disabled={updating}
-                />
-              </div>
-              
-                             <div>
-                 <label className="block text-sm font-medium text-slate-700 mb-1">Required Workers</label>
-                 <input
-                   type="number"
-                   name="requiredWorkers"
-                   value={editForm.requiredWorkers}
-                   onChange={handleEditChange}
-                   min="1"
-                   max="10000"
-                   className="w-full px-4 py-2 border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-800 bg-slate-50"
-                   disabled={updating}
-                 />
-               </div>
-
-               <div>
-                 <label className="block text-sm font-medium text-slate-700 mb-1">Payable Amount (per worker)</label>
-                 <input
-                   type="number"
-                   name="payableAmount"
-                   value={editForm.payableAmount}
-                   onChange={handleEditChange}
-                   min="1"
-                   max="1000"
-                   className="w-full px-4 py-2 border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-800 bg-slate-50"
-                   disabled={updating}
-                 />
-               </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Completion Date</label>
-                <input
-                  type="date"
-                  name="completionDate"
-                  value={editForm.completionDate}
-                  onChange={handleEditChange}
-                  className="w-full px-4 py-2 border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-800 bg-slate-50"
-                  disabled={updating}
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Submission Info</label>
-                <input
-                  type="text"
-                  name="submissionInfo"
-                  value={editForm.submissionInfo}
-                  onChange={handleEditChange}
-                  className="w-full px-4 py-2 border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-800 bg-slate-50"
-                  disabled={updating}
-                />
-              </div>
-
-                             <div>
-                 <label className="block text-sm font-medium text-slate-700 mb-1">Image URL (optional)</label>
-                 <input
-                   type="url"
-                   name="imageUrl"
-                   value={editForm.imageUrl}
-                   onChange={handleEditChange}
-                   className="w-full px-4 py-2 border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-800 bg-slate-50"
-                   disabled={updating}
-                 />
-               </div>
-
-               {/* Total Payable Preview */}
-               {editForm.requiredWorkers && editForm.payableAmount && (
-                 <div className="bg-slate-50 p-3 rounded-md">
-                   <div className="flex justify-between items-center text-sm">
-                     <span className="font-medium text-slate-700">Total Payable:</span>
-                     <span className="font-semibold text-blue-600">
-                       {Number(editForm.requiredWorkers) * Number(editForm.payableAmount)} coins
-                     </span>
-                   </div>
-                   <div className="flex justify-between items-center text-xs text-slate-500 mt-1">
-                     <span>Current Available Coins:</span>
-                     <span>{coins} coins</span>
-                   </div>
-                   {(Number(editForm.requiredWorkers) * Number(editForm.payableAmount)) > coins && (
-                     <div className="text-xs text-red-600 mt-1">
-                       ⚠️ Insufficient coins! You need {(Number(editForm.requiredWorkers) * Number(editForm.payableAmount)) - coins} more coins.
-                     </div>
-                   )}
-                 </div>
-               )}
-             </div>
-            
-            <div className="px-6 py-4 border-t border-slate-100 flex justify-end gap-2">
-                             <button 
-                 onClick={closeModal} 
-                 className="px-4 py-2 border border-slate-300 rounded-md text-sm font-medium text-slate-700 bg-white hover:bg-slate-50 disabled:opacity-50 transition-colors"
-                 disabled={updating}
-               >
-                 Cancel
-               </button>
-              <button 
-                onClick={handleEditSave} 
-                className="px-4 py-2 border border-transparent rounded-md text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 flex items-center gap-2 disabled:opacity-50"
-                disabled={updating}
+              <motion.div
+                whileHover={{ scale: 1.05 }}
+                className={`p-2 ${stat.bgColor} rounded-xl shadow-sm group-hover:shadow-md transition-all duration-300`}
               >
-                {updating ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                    Saving...
-                  </>
-                ) : (
-                  <>
-                    <FiSave className="h-4 w-4" />
-                    Save
-                  </>
-                )}
-              </button>
+                <div className={stat.textColor}>
+                  {stat.icon}
+                </div>
+              </motion.div>
+            </div>
+          </motion.div>
+        ))}
+      </motion.div>
+
+      {/* Tasks List */}
+      <motion.div
+        variants={fadeInUp}
+        className="bg-white/60 backdrop-blur-xl rounded-2xl border border-white/50 shadow-lg overflow-hidden"
+      >
+        <div className="px-4 py-3 border-b border-white/20 bg-gradient-to-r from-white/20 to-white/10">
+          <div className="flex items-center space-x-2">
+            <motion.div
+              whileHover={{ scale: 1.05 }}
+              className="w-6 h-6 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center shadow-sm"
+            >
+              <FiClipboard className="h-3 w-3 text-white" />
+            </motion.div>
+            <div>
+              <h2 className="text-lg font-semibold text-slate-800">My Tasks</h2>
+              <p className="text-xs text-slate-600">Manage and track your posted tasks</p>
             </div>
           </div>
         </div>
-      )}
-    </div>
+
+        {tasks.length === 0 ? (
+          <motion.div
+            variants={fadeInUp}
+            className="p-8 text-center"
+          >
+            <motion.div
+              whileHover={{ scale: 1.05 }}
+              className="w-12 h-12 bg-slate-100 rounded-xl flex items-center justify-center mx-auto mb-3"
+            >
+              <FiClipboard className="h-6 w-6 text-slate-400" />
+            </motion.div>
+            <h3 className="text-base font-semibold text-slate-600 mb-1">No Tasks Yet</h3>
+            <p className="text-sm text-slate-500">Create your first task to get started</p>
+          </motion.div>
+        ) : (
+          <div className="divide-y divide-white/20">
+            {tasks.map((task, index) => (
+              <motion.div
+                key={task._id}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.05 }}
+                className={`p-4 hover:bg-white/40 transition-all duration-200 ${
+                  index % 2 === 0 ? 'bg-white/20' : 'bg-white/10'
+                }`}
+              >
+                {editTask === task._id ? (
+                  // Edit Form
+                  <form onSubmit={handleUpdateTask} className="space-y-3">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <input
+                        type="text"
+                        value={editForm.title}
+                        onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
+                        className="px-3 py-2 bg-white/60 backdrop-blur-sm border border-white/50 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/50 text-sm"
+                        placeholder="Task title"
+                        required
+                      />
+                      <input
+                        type="date"
+                        value={editForm.completionDate}
+                        onChange={(e) => setEditForm({ ...editForm, completionDate: e.target.value })}
+                        className="px-3 py-2 bg-white/60 backdrop-blur-sm border border-white/50 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/50 text-sm"
+                        required
+                      />
+                    </div>
+                    
+                    <textarea
+                      value={editForm.detail}
+                      onChange={(e) => setEditForm({ ...editForm, detail: e.target.value })}
+                      className="w-full px-3 py-2 bg-white/60 backdrop-blur-sm border border-white/50 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/50 text-sm resize-none"
+                      rows={2}
+                      placeholder="Task description"
+                      required
+                    />
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <input
+                        type="number"
+                        value={editForm.requiredWorkers}
+                        onChange={(e) => setEditForm({ ...editForm, requiredWorkers: e.target.value })}
+                        className="px-3 py-2 bg-white/60 backdrop-blur-sm border border-white/50 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/50 text-sm"
+                        placeholder="Workers needed"
+                        min="1"
+                        required
+                      />
+                      <input
+                        type="number"
+                        value={editForm.payableAmount}
+                        onChange={(e) => setEditForm({ ...editForm, payableAmount: e.target.value })}
+                        className="px-3 py-2 bg-white/60 backdrop-blur-sm border border-white/50 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/50 text-sm"
+                        placeholder="Payment per worker"
+                        min="1"
+                        required
+                      />
+                    </div>
+
+                    <textarea
+                      value={editForm.submissionInfo}
+                      onChange={(e) => setEditForm({ ...editForm, submissionInfo: e.target.value })}
+                      className="w-full px-3 py-2 bg-white/60 backdrop-blur-sm border border-white/50 rounded-xl focus:outline-none focus:ring-2 focus:ring-violet-500/50 text-sm resize-none"
+                      rows={2}
+                      placeholder="Submission requirements (e.g., Screenshot, Video, Document)"
+                      required
+                    />
+
+                    {/* Image Upload Section */}
+                    <div className="space-y-2">
+                      <label className="block text-xs font-semibold text-slate-700">
+                        Task Image (Optional)
+                      </label>
+                      
+                      {!imagePreview ? (
+                        <div className="border-2 border-dashed border-white/50 rounded-xl p-4 text-center bg-white/20 backdrop-blur-sm">
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={handleFileSelect}
+                            className="hidden"
+                            id={`imageUpload-${editTask}`}
+                            disabled={imageUploading}
+                          />
+                          <label
+                            htmlFor={`imageUpload-${editTask}`}
+                            className="cursor-pointer flex flex-col items-center space-y-2"
+                          >
+                            <motion.div
+                              whileHover={{ scale: imageUploading ? 1 : 1.05 }}
+                              className="w-8 h-8 bg-violet-100 rounded-lg flex items-center justify-center"
+                            >
+                              {imageUploading ? (
+                                <motion.div
+                                  animate={{ rotate: 360 }}
+                                  transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                                  className="w-4 h-4 border-2 border-violet-600/30 border-t-violet-600 rounded-full"
+                                />
+                              ) : (
+                                <FiUpload className="h-4 w-4 text-violet-600" />
+                              )}
+                            </motion.div>
+                            <div>
+                              <p className="text-xs font-semibold text-slate-700">
+                                {imageUploading ? 'Uploading to Cloudinary...' : 'Upload Image'}
+                              </p>
+                              <p className="text-xs text-slate-500">
+                                {imageUploading ? 'Please wait...' : 'PNG, JPG up to 5MB'}
+                              </p>
+                            </div>
+                          </label>
+                        </div>
+                      ) : (
+                        <div className="relative">
+                          <img
+                            src={imagePreview}
+                            alt="Task preview"
+                            className="w-full max-w-xs h-32 object-cover rounded-xl shadow-sm"
+                          />
+                          {imageUploading && (
+                            <div className="absolute inset-0 bg-black/50 rounded-xl flex items-center justify-center">
+                              <div className="bg-white/90 backdrop-blur-sm rounded-lg px-3 py-2 flex items-center space-x-2">
+                                <motion.div
+                                  animate={{ rotate: 360 }}
+                                  transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                                  className="w-4 h-4 border-2 border-violet-600/30 border-t-violet-600 rounded-full"
+                                />
+                                <span className="text-xs font-semibold text-slate-700">Uploading...</span>
+                              </div>
+                            </div>
+                          )}
+                          <motion.button
+                            type="button"
+                            onClick={removeImage}
+                            disabled={imageUploading}
+                            whileHover={{ scale: imageUploading ? 1 : 1.05 }}
+                            whileTap={{ scale: imageUploading ? 1 : 0.95 }}
+                            className="absolute top-1 right-1 w-6 h-6 bg-red-600 text-white rounded-full flex items-center justify-center shadow-md hover:bg-red-700 transition-colors text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            ×
+                          </motion.button>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Live Preview of Total Cost */}
+                    {editForm.requiredWorkers && editForm.payableAmount && (
+                      <div className="bg-gradient-to-r from-blue-50/80 to-indigo-50/80 backdrop-blur-sm border border-blue-200/50 rounded-xl p-3">
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="font-semibold text-blue-700">Total Cost:</span>
+                          <span className="font-bold text-blue-800">
+                            {parseInt(editForm.requiredWorkers || 0) * parseInt(editForm.payableAmount || 0)} coins
+                          </span>
+                        </div>
+                        <div className="text-xs text-blue-600 mt-1">
+                          {editForm.requiredWorkers} workers × {editForm.payableAmount} coins each
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="flex items-center justify-end space-x-2 pt-2">
+                      <motion.button
+                        type="button"
+                        onClick={handleCancelEdit}
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        className="px-3 py-1 bg-white/60 border border-white/50 rounded-lg text-xs font-semibold text-slate-700 hover:bg-white/80 transition-all duration-200"
+                      >
+                        <FiX className="h-3 w-3 mr-1 inline" />
+                        Cancel
+                      </motion.button>
+                      <motion.button
+                        type="submit"
+                        disabled={updating}
+                        whileHover={{ scale: updating ? 1 : 1.02 }}
+                        whileTap={{ scale: updating ? 1 : 0.98 }}
+                        className="px-3 py-1 bg-gradient-to-r from-emerald-600 to-green-700 text-xs font-semibold text-white rounded-lg hover:from-emerald-700 hover:to-green-800 transition-all duration-200 disabled:opacity-50"
+                      >
+                        {updating ? (
+                          <motion.div
+                            animate={{ rotate: 360 }}
+                            transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                            className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full mr-1 inline-block"
+                          />
+                        ) : (
+                          <FiSave className="h-3 w-3 mr-1 inline" />
+                        )}
+                        {updating ? 'Saving...' : 'Save Changes'}
+                      </motion.button>
+                    </div>
+                  </form>
+                ) : (
+                  // Task Display
+                  <div className="space-y-3">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-2 mb-2">
+                          <h3 className="text-base font-semibold text-slate-800">{task.title}</h3>
+                          <motion.span
+                            whileHover={{ scale: 1.02 }}
+                            className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border shadow-sm ${getStatusColor(task.status)}`}
+                          >
+                            {task.status}
+                          </motion.span>
+                        </div>
+                        <p className="text-sm text-slate-600 mb-2">{task.detail}</p>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-2 text-xs">
+                          <div className="flex items-center space-x-1">
+                            <FiUsers className="h-3 w-3 text-blue-600" />
+                            <span className="text-slate-600">{task.requiredWorkers} workers</span>
+                          </div>
+                          <div className="flex items-center space-x-1">
+                            <FiDollarSign className="h-3 w-3 text-emerald-600" />
+                            <span className="text-slate-600">{task.payableAmount} coins each</span>
+                          </div>
+                          <div className="flex items-center space-x-1">
+                            <FiCalendar className="h-3 w-3 text-violet-600" />
+                            <span className="text-slate-600">{formatDate(task.completionDate)}</span>
+                          </div>
+                          <div className="flex items-center space-x-1">
+                            <HiSparkles className="h-3 w-3 text-amber-600" />
+                            <span className="font-semibold text-slate-700">{task.totalPayable || (task.requiredWorkers * task.payableAmount)} coins total</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center space-x-1 ml-4">
+                        <motion.button
+                          onClick={() => handleEdit(task)}
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                          className="p-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors shadow-sm"
+                        >
+                          <FiEdit className="h-3 w-3" />
+                        </motion.button>
+                        <motion.button
+                          onClick={() => handleDeleteTask(task._id)}
+                          disabled={deleting === task._id}
+                          whileHover={{ scale: deleting === task._id ? 1 : 1.05 }}
+                          whileTap={{ scale: deleting === task._id ? 1 : 0.95 }}
+                          className="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors shadow-sm disabled:opacity-50"
+                        >
+                          {deleting === task._id ? (
+                            <motion.div
+                              animate={{ rotate: 360 }}
+                              transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                              className="w-3 h-3 border-2 border-red-600/30 border-t-red-600 rounded-full"
+                            />
+                          ) : (
+                            <FiTrash2 className="h-3 w-3" />
+                          )}
+                        </motion.button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </motion.div>
+            ))}
+          </div>
+        )}
+      </motion.div>
+    </motion.div>
   );
 };
 
